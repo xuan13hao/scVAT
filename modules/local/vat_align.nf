@@ -28,7 +28,19 @@ process VAT_ALIGN {
     def args  = task.ext.args ?: ''
     def args2 = task.ext.args2 ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def mode_flag = alignment_mode == 'splice' ? '--splice' : alignment_mode == 'circ' ? '--circ' : alignment_mode == 'wgs' ? '--wgs' : ''
+    // Determine alignment mode based on input type
+    // For short reads, use appropriate preset (typically --sr for short reads)
+    // For long reads, use splice/wgs/circ as before
+    def mode_flag = ''
+    if (alignment_mode == 'splice') {
+        mode_flag = '--splice'
+    } else if (alignment_mode == 'circ') {
+        mode_flag = '--circ'
+    } else if (alignment_mode == 'wgs') {
+        mode_flag = '--wgs'
+    } else if (alignment_mode == 'sr' || alignment_mode == 'short_read') {
+        mode_flag = '--sr'  // Short-read preset for VAT
+    }
     def long_flag = long_read_mode ? '--long' : ''
     def output_format = bam_format ? 'sam' : (task.ext.output_format ?: 'sam')
     def output_file = bam_format ? "${prefix}.sam" : "${prefix}.${output_format}"

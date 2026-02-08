@@ -40,6 +40,14 @@
                     "type": "string",
                     "description": "MultiQC report title. Printed as page header, used for filename if not otherwise specified.",
                     "fa_icon": "fas fa-file-signature"
+                },
+                "input_type": {
+                    "type": "string",
+                    "description": "Type of input sequencing data. Options: 'long_read' for Oxford Nanopore long reads, 'short_read' for Illumina paired-end reads.",
+                    "enum": ["long_read", "short_read"],
+                    "default": "long_read",
+                    "fa_icon": "fas fa-dna",
+                    "help_text": "For short_read, input should be paired-end FASTQ (R1: Barcode/UMI, R2: Transcript). For long_read, input is single-end FASTQ from Oxford Nanopore."
                 }
             }
         },

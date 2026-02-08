@@ -8,7 +8,9 @@ process TAG_BARCODES {
         'biocontainers/pysam:0.19.1--py310hff46b53_1' }"
 
     input:
-    tuple val(meta), path(bam), path(bai), path(corrected_bc_info)
+    tuple val(meta), path(bam), path(bai)
+    path corrected_bc_info_or_whitelist  // Can be bc_info TSV (long-read) or whitelist (short-read)
+    val extract_from_readid               // boolean: extract from Read ID (short-read mode)
 
     output:
     tuple val(meta), path("*.tagged.bam"), emit: tagged_bam
@@ -20,11 +22,16 @@ process TAG_BARCODES {
     script:
     def args   = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
+    def extract_flag = extract_from_readid ? "--extract_from_readid" : ""
+    def whitelist_flag = extract_from_readid ? "--whitelist ${corrected_bc_info_or_whitelist}" : ""
+    def bc_info_flag = extract_from_readid ? "" : "-i ${corrected_bc_info_or_whitelist}"
 
     """
     tag_barcodes.py \\
         -b ${bam} \\
-        -i ${corrected_bc_info} \\
+        $bc_info_flag \\
+        $extract_flag \\
+        $whitelist_flag \\
         -o ${prefix}.tagged.bam
 
     cat <<-END_VERSIONS > versions.yml

@@ -131,6 +131,18 @@
                         "git_sha": "81880787133db07d9b4c1febd152c090eb8325dc",
                         "installed_by": ["modules"]
                     },
+                    "umitools/whitelist": {
+                        "branch": "master",
+                        "git_sha": "local",
+                        "installed_by": ["modules"],
+                        "note": "Local module for scVAT pipeline"
+                    },
+                    "umitools/extract": {
+                        "branch": "master",
+                        "git_sha": "local",
+                        "installed_by": ["modules"],
+                        "note": "Local module for scVAT pipeline"
+                    },
                     "unzipfiles": {
                         "branch": "master",
                         "git_sha": "81880787133db07d9b4c1febd152c090eb8325dc",

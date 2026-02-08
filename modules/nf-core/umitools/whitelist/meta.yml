@@ -1,0 +1,65 @@
+name: umitools_whitelist
+description: Identify valid cell barcodes from R1 FASTQ using UMI-tools whitelist
+keywords:
+  - umitools
+  - whitelist
+  - barcode
+  - cell barcode
+tools:
+  - umi_tools:
+      description: >
+        UMI-tools contains tools for dealing with Unique Molecular Identifiers (UMIs)/Random
+        Molecular Tags (RMTs) and single cell RNA-Seq cell barcodes
+
+      documentation: https://umi-tools.readthedocs.io/en/latest/
+      license: ["MIT"]
+      identifier: ""
+input:
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. [ id:'test', single_end:false ]
+    - fastq_r1:
+        type: file
+        description: |
+          R1 FASTQ file containing barcode and UMI sequences.
+        pattern: "*.{fastq,fastq.gz,fq,fq.gz}"
+  - - barcode_length:
+        type: integer
+        description: |
+          Length of the cell barcode (default: 16 for 10X)
+  - - umi_length:
+        type: integer
+        description: |
+          Length of the UMI (default: 12 for 10X)
+output:
+  - whitelist:
+      - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. [ id:'test', single_end:false ]
+      - "${prefix}.whitelist.txt":
+          type: file
+          description: Whitelist of valid cell barcodes
+          pattern: "*.{txt}"
+  - log:
+      - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. [ id:'test', single_end:false ]
+      - "*.log":
+          type: file
+          description: File with logging information
+          pattern: "*.{log}"
+  - versions:
+      - versions.yml:
+          type: file
+          description: File containing software versions
+          pattern: "versions.yml"
+authors:
+  - "@xuan13hao"
+maintainers:
+  - "@xuan13hao"

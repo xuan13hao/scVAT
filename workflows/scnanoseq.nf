@@ -71,6 +71,8 @@ include { BLAZE                             } from "../modules/local/blaze"
 include { PREEXTRACT_FASTQ                  } from "../modules/local/preextract_fastq.nf"
 include { READ_COUNTS                       } from "../modules/local/read_counts.nf"
 include { CORRECT_BARCODES                  } from "../modules/local/correct_barcodes"
+include { UMITOOLS_WHITELIST                } from "../modules/nf-core/umitools/whitelist/main"
+include { UMITOOLS_EXTRACT                  } from "../modules/nf-core/umitools/extract/main"
 include { UCSC_GTFTOGENEPRED                } from "../modules/local/ucsc_gtftogenepred"
 include { UCSC_GENEPREDTOBED                } from "../modules/local/ucsc_genepredtobed"
 
@@ -80,6 +82,8 @@ include { UCSC_GENEPREDTOBED                } from "../modules/local/ucsc_genepr
 include { PREPARE_REFERENCE_FILES                                     } from "../subworkflows/local/prepare_reference_files"
 include { PROCESS_LONGREAD_SCRNA as PROCESS_LONGREAD_SCRNA_GENOME     } from "../subworkflows/local/process_longread_scrna"
 include { PROCESS_LONGREAD_SCRNA as PROCESS_LONGREAD_SCRNA_TRANSCRIPT } from "../subworkflows/local/process_longread_scrna"
+include { PROCESS_SHORTREAD_SCRNA as PROCESS_SHORTREAD_SCRNA_GENOME     } from "../subworkflows/local/process_shortread_scrna"
+include { PROCESS_SHORTREAD_SCRNA as PROCESS_SHORTREAD_SCRNA_TRANSCRIPT } from "../subworkflows/local/process_shortread_scrna"
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -293,97 +297,162 @@ workflow SCNANOSEQ {
     }
 
     //
-    // MODULE: Unzip whitelist
+    // BRANCH: Process based on input_type (long_read or short_read)
     //
 
-    // NOTE: Blaze does not support '.gzip'
-    ch_blaze_whitelist = blaze_whitelist
+    // Initialize channels for both paths
+    ch_extracted_fastq = Channel.empty()
+    ch_corrected_bc_info = Channel.empty()
+    ch_umitools_whitelist = Channel.empty()
+    ch_read_counts = Channel.empty()
 
-    if (blaze_whitelist.endsWith('.gz')){
-
-        GUNZIP_WHITELIST ( [[:], blaze_whitelist ])
-
-        ch_blaze_whitelist =
-            GUNZIP_WHITELIST.out.file
-                .map {
-                    meta, whitelist ->
-                    [whitelist]
-                }
-
-        ch_versions = ch_versions.mix(GUNZIP_WHITELIST.out.versions)
-    }
-
-    //
-    // MODULE: Generate whitelist
-    //
-
-    BLAZE ( ch_trimmed_reads_combined, ch_blaze_whitelist )
-
-    ch_putative_bc = BLAZE.out.putative_bc
-    ch_gt_whitelist = BLAZE.out.whitelist
-    ch_whitelist_bc_count = BLAZE.out.bc_count
-    ch_versions = ch_versions.mix(BLAZE.out.versions)
-
-    ch_split_bc_fastqs = ch_trimmed_reads_combined
-    ch_split_bc = ch_putative_bc
-    if (params.split_amount > 0) {
-        SPLIT_FILE_BC_FASTQ( ch_trimmed_reads_combined, '.fastq', params.split_amount )
-
-        SPLIT_FILE_BC_FASTQ.out.split_files
-            .transpose()
-            .set { ch_split_bc_fastqs }
-
-        ch_versions = ch_versions.mix(SPLIT_FILE_BC_FASTQ.out.versions)
-
-        SPLIT_FILE_BC_CSV ( ch_putative_bc, '.csv', (params.split_amount / 4) )
-        SPLIT_FILE_BC_CSV.out.split_files
-            .transpose()
-            .set { ch_split_bc }
-    }
-
-
-    //
-    // MODULE: Extract barcodes
-    //
-
-    PREEXTRACT_FASTQ( ch_split_bc_fastqs.join(ch_split_bc), params.barcode_format )
-    ch_barcode_info = PREEXTRACT_FASTQ.out.barcode_info
-    ch_preextract_fastq = PREEXTRACT_FASTQ.out.extracted_fastq
-
-    //
-    // MODULE: Correct Barcodes
-    //
-
-    CORRECT_BARCODES (
-        ch_barcode_info
-            .combine ( ch_gt_whitelist, by: 0)
-            .combine ( ch_whitelist_bc_count, by: 0 )
-    )
-    ch_corrected_bc_file = CORRECT_BARCODES.out.corrected_bc_info
-    ch_versions = ch_versions.mix(CORRECT_BARCODES.out.versions)
-
-    ch_extracted_fastq = ch_preextract_fastq
-    ch_corrected_bc_info = ch_corrected_bc_file
-
-    if (params.split_amount > 0){
+    if (params.input_type == 'short_read') {
         //
-        // MODULE: Cat Preextract
+        // SHORT-READ BRANCH: Use UMI-tools for barcode detection
         //
-        CAT_CAT_PREEXTRACT(ch_preextract_fastq.groupTuple())
-        ch_cat_preextract_fastq = CAT_CAT_PREEXTRACT.out.file_out
+        
+        // For short-read, we need paired-end FASTQ (R1: barcode/UMI, R2: transcript)
+        // The samplesheet should provide both R1 and R2
+        // Split the input into R1 and R2 channels
+        ch_fastq_r1 = ch_trimmed_reads_combined
+            .map { meta, fastq -> 
+                // Assume R1 is the first file if multiple, or use fastq if single
+                [meta, fastq[0]]
+            }
+        
+        ch_fastq_r2 = ch_trimmed_reads_combined
+            .map { meta, fastq -> 
+                // Assume R2 is the second file if multiple, or use fastq if single
+                [meta, fastq.size() > 1 ? fastq[1] : fastq[0]]
+            }
 
         //
-        // MODULE: Cat barcode file
+        // MODULE: UMI-tools whitelist (identify valid cell barcodes from R1)
         //
-        CAT_CAT_BARCODE (ch_corrected_bc_file.groupTuple())
-        ch_corrected_bc_info = CAT_CAT_BARCODE.out.file_out
+        UMITOOLS_WHITELIST (
+            ch_fastq_r1,
+            params.barcode_length ?: 16,
+            params.umi_length ?: 12
+        )
+        ch_umitools_whitelist = UMITOOLS_WHITELIST.out.whitelist
+        ch_versions = ch_versions.mix(UMITOOLS_WHITELIST.out.versions)
 
         //
-        // MODULE: Zip the reads
+        // MODULE: UMI-tools extract (move Barcode/UMI from R2 to Read ID)
         //
-        PIGZ_COMPRESS (ch_cat_preextract_fastq )
-        ch_extracted_fastq = PIGZ_COMPRESS.out.archive
-        ch_versions = ch_versions.mix(PIGZ_COMPRESS.out.versions)
+        UMITOOLS_EXTRACT (
+            ch_fastq_r1
+                .join(ch_fastq_r2, by: 0)
+                .combine(ch_umitools_whitelist, by: 0),
+            ch_umitools_whitelist,
+            params.barcode_length ?: 16,
+            params.umi_length ?: 12
+        )
+        ch_extracted_fastq = UMITOOLS_EXTRACT.out.extracted_fastq
+        ch_versions = ch_versions.mix(UMITOOLS_EXTRACT.out.versions)
+        
+        // For short-read, corrected_bc_info is the whitelist (used for tagging)
+        ch_corrected_bc_info = ch_umitools_whitelist
+        
+    } else {
+        //
+        // LONG-READ BRANCH: Use BLAZE for barcode detection (existing workflow)
+        //
+        
+        //
+        // MODULE: Unzip whitelist
+        //
+
+        // NOTE: Blaze does not support '.gzip'
+        ch_blaze_whitelist = blaze_whitelist
+
+        if (blaze_whitelist.endsWith('.gz')){
+
+            GUNZIP_WHITELIST ( [[:], blaze_whitelist ])
+
+            ch_blaze_whitelist =
+                GUNZIP_WHITELIST.out.file
+                    .map {
+                        meta, whitelist ->
+                        [whitelist]
+                    }
+
+            ch_versions = ch_versions.mix(GUNZIP_WHITELIST.out.versions)
+        }
+
+        //
+        // MODULE: Generate whitelist
+        //
+
+        BLAZE ( ch_trimmed_reads_combined, ch_blaze_whitelist )
+
+        ch_putative_bc = BLAZE.out.putative_bc
+        ch_gt_whitelist = BLAZE.out.whitelist
+        ch_whitelist_bc_count = BLAZE.out.bc_count
+        ch_versions = ch_versions.mix(BLAZE.out.versions)
+
+        // Continue with long-read processing
+        ch_split_bc_fastqs = ch_trimmed_reads_combined
+        ch_split_bc = ch_putative_bc
+        if (params.split_amount > 0) {
+            SPLIT_FILE_BC_FASTQ( ch_trimmed_reads_combined, '.fastq', params.split_amount )
+
+            SPLIT_FILE_BC_FASTQ.out.split_files
+                .transpose()
+                .set { ch_split_bc_fastqs }
+
+            ch_versions = ch_versions.mix(SPLIT_FILE_BC_FASTQ.out.versions)
+
+            SPLIT_FILE_BC_CSV ( ch_putative_bc, '.csv', (params.split_amount / 4) )
+            SPLIT_FILE_BC_CSV.out.split_files
+                .transpose()
+                .set { ch_split_bc }
+        }
+
+
+        //
+        // MODULE: Extract barcodes
+        //
+
+        PREEXTRACT_FASTQ( ch_split_bc_fastqs.join(ch_split_bc), params.barcode_format )
+        ch_barcode_info = PREEXTRACT_FASTQ.out.barcode_info
+        ch_preextract_fastq = PREEXTRACT_FASTQ.out.extracted_fastq
+
+        //
+        // MODULE: Correct Barcodes
+        //
+
+        CORRECT_BARCODES (
+            ch_barcode_info
+                .combine ( ch_gt_whitelist, by: 0)
+                .combine ( ch_whitelist_bc_count, by: 0 )
+        )
+        ch_corrected_bc_file = CORRECT_BARCODES.out.corrected_bc_info
+        ch_versions = ch_versions.mix(CORRECT_BARCODES.out.versions)
+
+        ch_extracted_fastq = ch_preextract_fastq
+        ch_corrected_bc_info = ch_corrected_bc_file
+
+        if (params.split_amount > 0){
+            //
+            // MODULE: Cat Preextract
+            //
+            CAT_CAT_PREEXTRACT(ch_preextract_fastq.groupTuple())
+            ch_cat_preextract_fastq = CAT_CAT_PREEXTRACT.out.file_out
+
+            //
+            // MODULE: Cat barcode file
+            //
+            CAT_CAT_BARCODE (ch_corrected_bc_file.groupTuple())
+            ch_corrected_bc_info = CAT_CAT_BARCODE.out.file_out
+
+            //
+            // MODULE: Zip the reads
+            //
+            PIGZ_COMPRESS (ch_cat_preextract_fastq )
+            ch_extracted_fastq = PIGZ_COMPRESS.out.archive
+            ch_versions = ch_versions.mix(PIGZ_COMPRESS.out.versions)
+        }
     }
 
     //
@@ -430,13 +499,68 @@ workflow SCNANOSEQ {
     }
 
     //
-    // SUBWORKFLOW: Align Long Read Data
+    // SUBWORKFLOW: Align Data (Long-read or Short-read)
     //
 
     ch_multiqc_finalqc_files = Channel.empty()
 
     if (genome_quants){
-        PROCESS_LONGREAD_SCRNA_GENOME(
+        if (params.input_type == 'short_read') {
+            // SHORT-READ: Use short-read processing workflow
+            PROCESS_SHORTREAD_SCRNA_GENOME(
+                genome_fasta,
+                genome_fai,
+                gtf,
+                ch_fastq_r1,  // R1 for short-read
+                ch_extracted_fastq,  // R2 with barcode/UMI in Read ID
+                ch_rseqc_bed,
+                ch_umitools_whitelist,  // UMI-tools whitelist
+                genome_quants,
+                'umitools',  // Force umitools for short-read
+                true, // Used to indicate the bam is genome aligned
+                params.fasta_delimiter,
+                params.skip_save_minimap2_index,
+                params.skip_qc,
+                params.skip_rseqc,
+                params.skip_bam_nanocomp,
+                params.skip_seurat,
+                false  // Deduplication is mandatory for short-read
+            )
+            ch_versions = ch_versions.mix(PROCESS_SHORTREAD_SCRNA_GENOME.out.versions)
+
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_GENOME.out.minimap_flagstat.collect{it[1]}.ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_GENOME.out.minimap_idxstats.collect{it[1]}.ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_GENOME.out.minimap_rseqc_read_dist.collect{it[1]}.ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_GENOME.out.minimap_nanocomp_bam_txt.collect{it[1]}.ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_GENOME.out.bc_tagged_flagstat.collect{it[1]}.ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_GENOME.out.dedup_flagstat.collect{it[1]}.ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_GENOME.out.dedup_idxstats.collect{it[1]}.ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                ch_read_counts.collect().ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_GENOME.out.gene_qc_stats.collect().ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_GENOME.out.transcript_qc_stats.collect().ifEmpty([])
+            )
+        } else {
+            // LONG-READ: Use long-read processing workflow
+            PROCESS_LONGREAD_SCRNA_GENOME(
             genome_fasta,
             genome_fai,
             gtf,
@@ -488,14 +612,61 @@ workflow SCNANOSEQ {
         ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
             PROCESS_LONGREAD_SCRNA_GENOME.out.gene_qc_stats.collect().ifEmpty([])
         )
-        ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
-            PROCESS_LONGREAD_SCRNA_GENOME.out.transcript_qc_stats.collect().ifEmpty([])
-        )
-    }
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_LONGREAD_SCRNA_GENOME.out.transcript_qc_stats.collect().ifEmpty([])
+            )
+        }
+        }
 
     // oarfish expects deduplicated reads
     if (transcript_quants) {
-        PROCESS_LONGREAD_SCRNA_TRANSCRIPT (
+        if (params.input_type == 'short_read') {
+            // SHORT-READ: Use short-read processing workflow
+            PROCESS_SHORTREAD_SCRNA_TRANSCRIPT (
+                transcript_fasta,
+                transcript_fai,
+                gtf,
+                ch_fastq_r1,  // R1 for short-read
+                ch_extracted_fastq,  // R2 with barcode/UMI in Read ID
+                ch_rseqc_bed,
+                ch_umitools_whitelist,  // UMI-tools whitelist
+                transcript_quants,
+                'umitools',  // Force umitools for short-read
+                false, // Indicates this is NOT genome aligned
+                params.fasta_delimiter,
+                params.skip_save_minimap2_index,
+                params.skip_qc,
+                true, // RSeQC does not work well with transcriptome alignments
+                true, // Nanocomp does not work well with transcriptome alignments
+                params.skip_seurat,
+                false // Deduplication is mandatory for short-read
+            )
+            ch_versions = ch_versions.mix(PROCESS_SHORTREAD_SCRNA_TRANSCRIPT.out.versions)
+
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_TRANSCRIPT.out.minimap_flagstat.collect{it[1]}.ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_TRANSCRIPT.out.minimap_rseqc_read_dist.collect{it[1]}.ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_TRANSCRIPT.out.minimap_nanocomp_bam_txt.collect{it[1]}.ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_TRANSCRIPT.out.bc_tagged_flagstat.collect{it[1]}.ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_TRANSCRIPT.out.dedup_flagstat.collect{it[1]}.ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                ch_read_counts.collect().ifEmpty([])
+            )
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_TRANSCRIPT.out.transcript_qc_stats.collect().ifEmpty([])
+            )
+        } else {
+            // LONG-READ: Use long-read processing workflow
+            PROCESS_LONGREAD_SCRNA_TRANSCRIPT (
             transcript_fasta,
             transcript_fai,
             gtf,
@@ -539,10 +710,11 @@ workflow SCNANOSEQ {
         ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
             ch_read_counts.collect().ifEmpty([])
         )
-        ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
-            PROCESS_LONGREAD_SCRNA_TRANSCRIPT.out.transcript_qc_stats.collect().ifEmpty([])
-        )
-    }
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_LONGREAD_SCRNA_TRANSCRIPT.out.transcript_qc_stats.collect().ifEmpty([])
+            )
+        }
+        }
 
     //
     // SOFTWARE_VERSIONS

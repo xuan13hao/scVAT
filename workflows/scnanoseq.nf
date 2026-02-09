@@ -308,7 +308,8 @@ workflow SCNANOSEQ {
         ch_unzipped_fastqs = GUNZIP_FASTQ.out.file
             .map { meta, file ->
                 // Create a grouping key without 'read' for grouping R1 and R2 together
-                def group_key = meta - ['read']
+                // In Groovy/Nextflow, use findAll to create a new map without 'read' key
+                def group_key = meta.findAll { k, v -> k != 'read' }
                 [group_key, meta, file]
             }
             .groupTuple(by: [0])

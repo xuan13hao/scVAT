@@ -116,9 +116,12 @@ fi
 echo ""
 echo "Creating samplesheet..."
 SAMPLESHEET="$TEST_DATA_DIR/samplesheet_longread.csv"
+# Use relative paths from project root (where Nextflow is launched)
+# Files are in test_data/longread/, so use relative path
+FASTQ_REL="test_data/longread/$(basename "$FASTQ_FILE")"
 cat > "$SAMPLESHEET" << EOF
 sample,fastq,cell_count
-TEST_SAMPLE,$(pwd)/$FASTQ_FILE,$NUM_CELLS
+TEST_SAMPLE,$FASTQ_REL,$NUM_CELLS
 EOF
 
 echo "✓ Samplesheet created: $SAMPLESHEET"

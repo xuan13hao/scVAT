@@ -28,11 +28,19 @@ process BLAZE {
     def prefix     = task.ext.prefix ?: "${meta.id}"
     // WARN: Version information not provided by tool on CLI. Please update this string when upgrading BLAZE code
     def VERSION    = '2.5.1'
-    def cell_count = "${meta.cell_count}"
+    // Handle cell_count: only include --expect-cells if it's a valid integer
+    def cell_count = meta.cell_count
+    def expect_cells_flag = ''
+    if (cell_count != null) {
+        def cell_count_str = cell_count.toString().trim()
+        if (cell_count_str != '' && cell_count_str != 'null' && cell_count_str.isNumber()) {
+            expect_cells_flag = "--expect-cells ${cell_count_str.toInteger()}"
+        }
+    }
 
     """
     blaze \\
-        --expect-cells ${cell_count} \\
+        ${expect_cells_flag} \\
         --full-bc-whitelist ${in_whitelist} \\
         --output-prefix ${prefix}. \\
         --threads $task.cpus \\

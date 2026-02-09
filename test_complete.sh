@@ -40,6 +40,54 @@ DATA_GEN_PASSED=0
 LONGREAD_TEST_PASSED=0
 SHORTREAD_TEST_PASSED=0
 
+# Detect a working execution profile for Nextflow
+# Preference order: docker -> apptainer -> singularity -> conda
+detect_profile() {
+    # If user explicitly set NXF_PROFILE, respect it
+    if [[ -n "${NXF_PROFILE:-}" ]]; then
+        echo "$NXF_PROFILE"
+        return 0
+    fi
+
+    # docker must be callable and daemon accessible
+    if command -v docker &> /dev/null && docker info >/dev/null 2>&1; then
+        echo "docker"
+        return 0
+    fi
+
+    # apptainer / singularity
+    if command -v apptainer &> /dev/null; then
+        echo "apptainer"
+        return 0
+    fi
+    if command -v singularity &> /dev/null; then
+        echo "singularity"
+        return 0
+    fi
+
+    # conda fallback (only if conda exists)
+    if command -v conda &> /dev/null; then
+        echo "conda"
+        return 0
+    fi
+
+    echo ""
+    return 1
+}
+
+EXEC_PROFILE="$(detect_profile || true)"
+
+# Helper to join profiles: "test_xxx_local,<engine>"
+join_profiles() {
+    local base_profile="$1"
+    local engine_profile="$2"
+    if [[ -z "$engine_profile" ]]; then
+        echo "$base_profile"
+    else
+        echo "${base_profile},${engine_profile}"
+    fi
+}
+
 # Function to print section header
 print_section() {
     echo ""
@@ -87,16 +135,12 @@ check_prerequisites() {
     
     # Check container engine (for run mode)
     if [ "$TEST_ACTION" == "run" ] || [ "$TEST_ACTION" == "full" ]; then
-        if command -v docker &> /dev/null; then
-            echo -e "${GREEN}✓ Docker found${NC}"
-        elif command -v singularity &> /dev/null; then
-            echo -e "${GREEN}✓ Singularity found${NC}"
+        if [[ -z "$EXEC_PROFILE" ]]; then
+            echo -e "${YELLOW}⚠ No usable execution profile detected (docker/apptainer/singularity/conda)${NC}"
+            echo "  Set NXF_PROFILE=docker|apptainer|singularity|conda to override."
+            all_ok=false
         else
-            echo -e "${YELLOW}⚠ Neither Docker nor Singularity found${NC}"
-            echo "  Pipeline requires container engine for execution"
-            if [ "$TEST_ACTION" == "run" ]; then
-                all_ok=false
-            fi
+            echo -e "${GREEN}✓ Execution profile: ${EXEC_PROFILE}${NC}"
         fi
     fi
     
@@ -256,12 +300,15 @@ test_longread() {
         fi
     elif [ "$TEST_ACTION" == "run" ] || [ "$TEST_ACTION" == "full" ]; then
         local outdir="test_output/longread_$(date +%Y%m%d_%H%M%S)"
+        local profile
+        profile="$(join_profiles test_longread_local "$EXEC_PROFILE")"
         echo "Running long-read pipeline..."
         echo "Output directory: $outdir"
+        echo "Profile: $profile"
         echo ""
         
         if nextflow run . \
-            -profile test_longread_local,docker \
+            -profile "$profile" \
             --outdir "$outdir" \
             -with-dag "${outdir}/dag.html" \
             -with-report "${outdir}/report.html" \
@@ -295,12 +342,15 @@ test_shortread() {
         fi
     elif [ "$TEST_ACTION" == "run" ] || [ "$TEST_ACTION" == "full" ]; then
         local outdir="test_output/shortread_$(date +%Y%m%d_%H%M%S)"
+        local profile
+        profile="$(join_profiles test_shortread_local "$EXEC_PROFILE")"
         echo "Running short-read pipeline..."
         echo "Output directory: $outdir"
+        echo "Profile: $profile"
         echo ""
         
         if nextflow run . \
-            -profile test_shortread_local,docker \
+            -profile "$profile" \
             --outdir "$outdir" \
             -with-dag "${outdir}/dag.html" \
             -with-report "${outdir}/report.html" \

@@ -1,2 +1,2 @@
 sample,fastq,cell_count
-TEST_SAMPLE,/home/xuan/scVAT/test_data/longread/test_longread.fastq.gz,10
+TEST_SAMPLE,test_data/longread/test_longread.fastq.gz,10

@@ -30,3 +30,6 @@
 2026-02-09 13:35:30	-	confident_franklin	-	8672f793b7a53b2c9a827cf54345daae	ee31062f-eab3-4471-a2ee-288d5a64341c	nextflow run . -profile test_shortread_local,docker --help
 2026-02-09 13:35:56	-	cheesy_engelbart	-	8672f793b7a53b2c9a827cf54345daae	8ef055db-ebb0-4de0-90d8-c7d090a3e401	nextflow run . -profile test_longread_local,docker --help
 2026-02-09 13:36:09	-	loving_feynman	-	8672f793b7a53b2c9a827cf54345daae	73a8d946-f1ad-44cb-b816-9c41b8ffbccf	nextflow run . -profile test_shortread_local,docker --help
+2026-02-09 13:44:01	-	intergalactic_keller	-	8672f793b7a53b2c9a827cf54345daae	86befe15-bcc1-4116-9bfd-80bd07067bd5	nextflow run . -profile test_longread_local,docker --help
+2026-02-09 13:44:13	-	serene_becquerel	-	8672f793b7a53b2c9a827cf54345daae	9f8c10ba-ec7c-4653-be86-674b165f01ae	nextflow run . -profile test_shortread_local,docker --help
+2026-02-09 13:47:35	-	trusting_albattani	-	8672f793b7a53b2c9a827cf54345daae	f734a1cd-c1f8-4b5b-9989-c01ddf843e9c	nextflow run . -profile test_longread_local,docker --outdir test_output/longread_20260209_134730 -with-dag test_output/longread_20260209_134730/dag.html -with-report test_output/longread_20260209_134730/report.html -with-trace test_output/longread_20260209_134730/trace.txt

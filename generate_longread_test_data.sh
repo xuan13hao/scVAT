@@ -14,7 +14,7 @@ TEST_DATA_DIR="test_data/longread"
 mkdir -p "$TEST_DATA_DIR"
 
 # Parameters
-NUM_READS=500
+NUM_READS=2000  # Increased to ensure enough reads pass BLAZE filtering
 NUM_CELLS=10
 BARCODE_LEN=16
 UMI_LEN=12
@@ -64,9 +64,12 @@ transcripts = [
     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
 ]
 
-def generate_quality(length):
-    # For long-reads, use a mix of quality scores (simulating Nanopore)
-    return ''.join(random.choices('FGHIJKLMNOPQRSTUVWXYZ', k=length))
+def generate_quality(length, min_qual='P'):
+    # For long-reads, use quality scores >= 15 (P in Phred+33) for barcode/UMI regions
+    # BLAZE requires Q>=15 for barcode bases
+    # Use higher quality for barcode/UMI, lower for transcript
+    high_qual = ''.join(random.choices('PQRSTUVWXYZ', k=length))
+    return high_qual
 
 fq_file = open('$FASTQ_FILE', 'w')
 
@@ -80,14 +83,22 @@ for i in range($NUM_READS):
     umi = ''.join(random.choices('ACGT', k=$UMI_LEN))
     
     # For long-reads, the barcode and UMI are embedded in the read sequence
-    # Format: NNN (primer) + barcode + UMI + polyT + transcript
-    primer = 'NNN'
-    polyT = 'T' * 20
+    # Format for 10X 3v3: barcode (16bp) + UMI (12bp) + polyT (10-20bp) + transcript
+    # BLAZE expects to find polyT and adapter sequences to identify barcode position
+    # Use longer polyT to help BLAZE detect it (minimum 10bp, use 15bp for better detection)
+    polyT = 'T' * 15
     transcript = random.choice(transcripts)
     
-    # Full read sequence
-    read_seq = primer + barcode + umi + polyT + transcript
-    read_qual = generate_quality(len(read_seq))
+    # Full read sequence: barcode + UMI + polyT + transcript
+    # Note: BLAZE will search for polyT and adapter patterns to locate barcode
+    read_seq = barcode + umi + polyT + transcript
+    
+    # Generate quality scores: high quality for barcode/UMI (required by BLAZE: Q>=15)
+    # Phred+33: P=15, Q=16, R=17, S=18, T=19, U=20, V=21, W=22, X=23, Y=24, Z=25
+    bc_umi_qual = ''.join(random.choices('PQRSTUVWXYZ', k=len(barcode) + len(umi)))
+    polyT_qual = ''.join(random.choices('PQRSTUVWXYZ', k=len(polyT)))
+    transcript_qual = ''.join(random.choices('FGHIJKLMNOPQRSTUVWXYZ', k=len(transcript)))
+    read_qual = bc_umi_qual + polyT_qual + transcript_qual
     
     # Write FASTQ entry
     fq_file.write(f"@{read_id}\n")

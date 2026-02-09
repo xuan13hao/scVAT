@@ -28,19 +28,25 @@ process BLAZE {
     def prefix     = task.ext.prefix ?: "${meta.id}"
     // WARN: Version information not provided by tool on CLI. Please update this string when upgrading BLAZE code
     def VERSION    = '2.5.1'
-    // Handle cell_count: only include --expect-cells if it's a valid integer
+    // Handle cell_count: BLAZE requires one of: --expect-cells, --count-threshold, --no-whitelisting, or --force-cells
     def cell_count = meta.cell_count
-    def expect_cells_flag = ''
+    def cell_param = ''
     if (cell_count != null) {
         def cell_count_str = cell_count.toString().trim()
         if (cell_count_str != '' && cell_count_str != 'null' && cell_count_str.isNumber()) {
-            expect_cells_flag = "--expect-cells ${cell_count_str.toInteger()}"
+            cell_param = "--expect-cells ${cell_count_str.toInteger()}"
+        } else {
+            // Fallback: use count-threshold if cell_count is invalid
+            cell_param = '--count-threshold 1'
         }
+    } else {
+        // Fallback: use count-threshold if cell_count is null
+        cell_param = '--count-threshold 1'
     }
 
     """
     blaze \\
-        ${expect_cells_flag} \\
+        ${cell_param} \\
         --full-bc-whitelist ${in_whitelist} \\
         --output-prefix ${prefix}. \\
         --threads $task.cpus \\

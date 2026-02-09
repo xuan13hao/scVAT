@@ -117,16 +117,16 @@ workflow PIPELINE_INITIALISATION {
                     }
                 } else {
                     // Long-read format - use original logic
-                    if (row.size() >= 3) {
+                    if (row.size() >= 3 && row[2] instanceof String && row[2].trim().isNumber()) {
                         def fastq = file(row[1])
-                        cell_count_val = row[2] as Integer
+                        cell_count_val = row[2].trim().toInteger()
                         return [ meta.id, meta + [ single_end:true, cell_count: cell_count_val ], [ fastq ] ]
-                    } else if (row.size() == 2) {
+                    } else if (row.size() >= 2) {
                         def fastq = file(row[1])
                         return [ meta.id, meta + [ single_end:true, cell_count: null ], [ fastq ] ]
                     } else if (meta.containsKey('fastq')) {
                         def fastq = file(meta.fastq)
-                        cell_count_val = meta.containsKey('cell_count') ? meta.cell_count as Integer : null
+                        cell_count_val = meta.containsKey('cell_count') ? (meta.cell_count instanceof String && meta.cell_count.trim().isNumber() ? meta.cell_count.trim().toInteger() : null) : null
                         return [ meta.id, meta + [ single_end:true, cell_count: cell_count_val ], [ fastq ] ]
                     } else {
                         error("Long-read samplesheet entry must have 'fastq' column. Found keys: ${meta.keySet()}")

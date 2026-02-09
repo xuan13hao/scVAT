@@ -71,10 +71,16 @@ workflow PROCESS_LONGREAD_SCRNA {
         // MODULE: Tag Barcodes
         //
 
+        ch_bam_bai = ALIGN_LONGREADS.out.sorted_bam
+            .join( ALIGN_LONGREADS.out.sorted_bai, by: 0 )
+        
+        ch_bam_bai_bc = ch_bam_bai
+            .join( read_bc_info, by: 0 )
+        
         TAG_BARCODES (
-            ALIGN_LONGREADS.out.sorted_bam
-                .join( ALIGN_LONGREADS.out.sorted_bai, by: 0 )
-                .join( read_bc_info, by: 0)
+            ch_bam_bai_bc.map { meta, bam, bai, bc_info -> [meta, bam, bai] },
+            ch_bam_bai_bc.map { meta, bam, bai, bc_info -> bc_info },
+            false  // extract_from_readid: false for long-read
         )
         ch_versions = ch_versions.mix(TAG_BARCODES.out.versions)
 

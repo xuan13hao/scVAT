@@ -156,13 +156,21 @@ workflow SCNANOSEQ {
 
     //
     // MODULE: Combine fastqs from the same sample
+    // Note: For short-read mode, R1 and R2 should be kept separate, so skip CAT_FASTQ
     //
-    CAT_FASTQ ( ch_fastqs.multiple )
-        .reads
-        .mix ( ch_fastqs.single )
-        .set { ch_cat_fastq }
-
-    ch_versions = ch_versions.mix (CAT_FASTQ.out.versions.first().ifEmpty(null))
+    ch_cat_fastq = Channel.empty()
+    if (params.input_type == 'short_read') {
+        // For short-read, keep R1 and R2 separate (don't combine via CAT_FASTQ)
+        // The samplesheet parsing already provides them as separate files
+        ch_cat_fastq = ch_fastqs
+    } else {
+        // For long-read, combine multiple FASTQ files if needed
+        CAT_FASTQ ( ch_fastqs.multiple )
+            .reads
+            .mix ( ch_fastqs.single )
+            .set { ch_cat_fastq }
+        ch_versions = ch_versions.mix (CAT_FASTQ.out.versions.first().ifEmpty(null))
+    }
 
     //
     // SUBWORKFLOW: Fastq QC with Nanoplot, ToulligQC and FastQC - pre-trim QC
@@ -170,8 +178,30 @@ workflow SCNANOSEQ {
 
     ch_fastqc_multiqc_pretrim = Channel.empty()
     if (!params.skip_qc){
+        // For short-read, we need to handle paired-end files separately
+        // QC workflow expects [meta, fastq] format, not [meta, [fastq_r1, fastq_r2]]
+        def ch_qc_fastq_input = Channel.empty()
+        if (params.input_type == 'short_read') {
+            // For short-read, split R1 and R2 and process separately
+            // We'll process R2 (transcript) for QC, as R1 only contains barcode/UMI
+            ch_qc_fastq_input = ch_cat_fastq
+                .map { meta, fastqs ->
+                    // fastqs is a list [fastq_r1, fastq_r2]
+                    // Process R2 (transcript) for QC
+                    def fastq_r2 = fastqs.size() > 1 ? fastqs[1] : fastqs[0]
+                    [meta, fastq_r2]
+                }
+        } else {
+            // For long-read, format is already [meta, fastq] or [meta, [fastq]]
+            ch_qc_fastq_input = ch_cat_fastq
+                .map { meta, fastq ->
+                    // Handle both single file and list of files
+                    def fastq_file = fastq instanceof List ? fastq[0] : fastq
+                    [meta, fastq_file]
+                }
+        }
 
-        FASTQC_NANOPLOT_PRE_TRIM ( ch_cat_fastq, params.skip_nanoplot, params.skip_toulligqc, params.skip_fastqc )
+        FASTQC_NANOPLOT_PRE_TRIM ( ch_qc_fastq_input, params.skip_nanoplot, params.skip_toulligqc, params.skip_fastqc )
 
         ch_versions = ch_versions.mix(FASTQC_NANOPLOT_PRE_TRIM.out.nanoplot_version.first().ifEmpty(null))
         ch_versions = ch_versions.mix(FASTQC_NANOPLOT_PRE_TRIM.out.toulligqc_version.first().ifEmpty(null))
@@ -188,9 +218,21 @@ workflow SCNANOSEQ {
     ch_nanocomp_fastq_html = Channel.empty()
     ch_nanocomp_fastq_txt = Channel.empty()
     if (!params.skip_qc && !params.skip_fastq_nanocomp) {
+        // For short-read, use R2 (transcript) for NanoComp
+        def ch_nanocomp_input = params.input_type == 'short_read' ?
+            ch_cat_fastq
+                .map { meta, fastqs ->
+                    def fastq_r2 = fastqs.size() > 1 ? fastqs[1] : fastqs[0]
+                    [meta, fastq_r2]
+                } :
+            ch_cat_fastq
+                .map { meta, fastq ->
+                    def fastq_file = fastq instanceof List ? fastq[0] : fastq
+                    [meta, fastq_file]
+                }
 
         NANOCOMP_FASTQ (
-            ch_cat_fastq
+            ch_nanocomp_input
                 .collect{it[1]}
                 .map{
                     [ [ 'id': 'nanocomp_fastq.' ] , it ]
@@ -242,8 +284,39 @@ workflow SCNANOSEQ {
     //
     // MODULE: Unzip fastq
     //
-    GUNZIP_FASTQ( ch_cat_fastq )
-    ch_unzipped_fastqs = GUNZIP_FASTQ.out.file
+    // For short-read, we need to handle paired-end files separately
+    // GUNZIP_FASTQ expects [meta, fastq] format
+    def ch_gunzip_r1 = params.input_type == 'short_read' ?
+        ch_cat_fastq.map { meta, fastqs -> [meta + [read: 'R1'], fastqs[0]] } :
+        Channel.empty()
+    
+    def ch_gunzip_r2 = params.input_type == 'short_read' ?
+        ch_cat_fastq.map { meta, fastqs -> [meta + [read: 'R2'], fastqs.size() > 1 ? fastqs[1] : fastqs[0]] } :
+        Channel.empty()
+    
+    def ch_gunzip_longread = params.input_type != 'short_read' ?
+        ch_cat_fastq.map { meta, fastq ->
+            def fastq_file = fastq instanceof List ? fastq[0] : fastq
+            [meta, fastq_file]
+        } :
+        Channel.empty()
+    
+    if (params.input_type == 'short_read') {
+        // For short-read, unzip both R1 and R2 separately
+        GUNZIP_FASTQ( ch_gunzip_r1.mix(ch_gunzip_r2) )
+        ch_unzipped_fastqs = GUNZIP_FASTQ.out.file
+            .groupTuple(by: [0])
+            .map { meta_list, files ->
+                // Reconstruct the original meta (without 'read' key) and pair files
+                def meta = meta_list[0] - ['read']
+                [meta, files]
+            }
+    } else {
+        // For long-read, format is already correct
+        GUNZIP_FASTQ( ch_gunzip_longread )
+        ch_unzipped_fastqs = GUNZIP_FASTQ.out.file
+            .map { meta, fastq -> [meta, [fastq]] }
+    }
     ch_versions = ch_versions.mix( GUNZIP_FASTQ.out.versions )
 
     //

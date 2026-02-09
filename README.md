@@ -1,5 +1,6 @@
 
 ## Introduction
+scVAT: An nf-core single-cell RNA-sequencing analysis pipeline supporting both short and long reads
 
 **nf-core/scVAT** is a bioinformatics best-practice analysis pipeline for single-cell/nuclei RNA-seq data supporting both **long-read (Oxford Nanopore)** and **short-read (Illumina)** sequencing technologies. The pipeline uses **VAT (Versatile Alignment Tool)** as the core aligner for both data types.
 
@@ -260,6 +261,8 @@ For further information or help, don't hesitate to get in touch on the [Slack `#
 If you use VAT for alignment, please also cite:
 
 > **VAT (Versatile Alignment Tool)**
+>
+>Hao Xuan, Hongyang Sun, Xiangtao Liu, Hanyuan Zhang, Jun Zhang, Cuncong Zhong. A general and extensible algorithmic framework to biological sequence alignment across scales and applications. bioRxiv 2026.01.28.702355; doi: https://doi.org/10.64898/2026.01.28.702355
 >
 > Please refer to the [VAT GitHub repository](https://github.com/xuan13hao/VAT) for the most current citation information.
 

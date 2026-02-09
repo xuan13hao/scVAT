@@ -167,8 +167,20 @@
                 },
                 "barcode_format": {
                     "type": "string",
-                    "description": "Specify the format for the barcode+umi. This parameter also defines a default barcode whitelist for the pipeline to use for barcode calling, this can be overridden with the 'whitelist' parameter.",
+                    "description": "Specify the format for the barcode+umi (for long-read mode). This parameter also defines a default barcode whitelist for the pipeline to use for barcode calling, this can be overridden with the 'whitelist' parameter. Not required for short-read mode.",
                     "enum": ["10X_3v3", "10X_3v4", "10X_5v2", "10X_5v3"],
+                    "fa_icon": "fas fa-barcode"
+                },
+                "barcode_length": {
+                    "type": "integer",
+                    "description": "Length of cell barcode in base pairs (for short-read mode). Default: 16 for 10X.",
+                    "default": 16,
+                    "fa_icon": "fas fa-barcode"
+                },
+                "umi_length": {
+                    "type": "integer",
+                    "description": "Length of UMI in base pairs (for short-read mode). Default: 12 for 10X.",
+                    "default": 12,
                     "fa_icon": "fas fa-barcode"
                 },
                 "dedup_tool": {
@@ -178,7 +190,7 @@
                 }
             },
             "fa_icon": "fas fa-microscope",
-            "required": ["barcode_format", "dedup_tool"]
+            "required": ["dedup_tool"]
         },
         "mapping": {
             "title": "Mapping",

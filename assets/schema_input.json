@@ -2,7 +2,7 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://raw.githubusercontent.com/nf-core/scnanoseq/master/assets/schema_input.json",
     "title": "nf-core/scnanoseq pipeline - params.input schema",
-    "description": "Schema for the file provided with params.input",
+    "description": "Schema for the file provided with params.input. Supports both long-read (single-end) and short-read (paired-end) formats.",
     "type": "array",
     "items": {
         "type": "object",
@@ -18,13 +18,38 @@
                 "format": "file-path",
                 "unique": true,
                 "exists": true,
-                "pattern": "^\\S+\\.f(ast)?q\\.gz$",
-                "errorMessage": "FastQ file for reads 1 must be provided, cannot contain spaces and must have extension '.fq.gz' or '.fastq.gz'"
+                "pattern": "^\\S+\\.f(ast)?q(\\.gz)?$",
+                "errorMessage": "FastQ file for long-read (single-end) must be provided, cannot contain spaces and must have extension '.fq', '.fastq', '.fq.gz' or '.fastq.gz'"
+            },
+            "fastq_1": {
+                "type": "string",
+                "format": "file-path",
+                "unique": true,
+                "exists": true,
+                "pattern": "^\\S+\\.f(ast)?q(\\.gz)?$",
+                "errorMessage": "FastQ file R1 (barcode/UMI) for short-read (paired-end) must be provided, cannot contain spaces and must have extension '.fq', '.fastq', '.fq.gz' or '.fastq.gz'"
+            },
+            "fastq_2": {
+                "type": "string",
+                "format": "file-path",
+                "unique": true,
+                "exists": true,
+                "pattern": "^\\S+\\.f(ast)?q(\\.gz)?$",
+                "errorMessage": "FastQ file R2 (transcript) for short-read (paired-end) must be provided, cannot contain spaces and must have extension '.fq', '.fastq', '.fq.gz' or '.fastq.gz'"
             },
             "cell_count": {
                 "type": "integer"
             }
         },
-        "required": ["sample", "fastq", "cell_count"]
+        "oneOf": [
+            {
+                "description": "Long-read format: requires fastq (single-end)",
+                "required": ["sample", "fastq", "cell_count"]
+            },
+            {
+                "description": "Short-read format: requires fastq_1 and fastq_2 (paired-end)",
+                "required": ["sample", "fastq_1", "fastq_2", "cell_count"]
+            }
+        ]
     }
 }

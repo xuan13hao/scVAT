@@ -72,11 +72,66 @@ workflow PIPELINE_INITIALISATION {
     // Create channel from input file provided through params.input
     //
 
+    // Parse samplesheet manually for short-read format, or use samplesheetToList for long-read
+    def samplesheet_data = []
+    if (params.input_type == 'short_read') {
+        // For short-read, manually parse CSV to handle fastq_1 and fastq_2
+        def csv_file = new File(params.input)
+        def header = null
+        csv_file.eachLine { line, lineNum ->
+            if (lineNum == 1) {
+                header = line.split(',')
+            } else if (line.trim()) {
+                def values = line.split(',')
+                def row_map = [:]
+                header.eachWithIndex { col, idx ->
+                    if (idx < values.size()) {
+                        row_map[col.trim()] = values[idx].trim()
+                    }
+                }
+                samplesheet_data.add([row_map])
+            }
+        }
+    } else {
+        // For long-read, use samplesheetToList
+        samplesheet_data = samplesheetToList(params.input, "${projectDir}/assets/schema_input.json")
+    }
+
     Channel
-        .fromList(samplesheetToList(params.input, "${projectDir}/assets/schema_input.json"))
+        .fromList(samplesheet_data)
         .map{
-            meta, fastq, cell_count_val ->
-                return [ meta.id, meta + [ single_end:true, cell_count: cell_count_val ], [ fastq ] ]
+            row ->
+                def meta = row[0]
+                def cell_count_val = null
+                
+                // For short-read, meta contains all CSV columns
+                if (params.input_type == 'short_read') {
+                    if (meta.containsKey('fastq_1') && meta.containsKey('fastq_2')) {
+                        def fastq_1 = file(meta.fastq_1)
+                        def fastq_2 = file(meta.fastq_2)
+                        cell_count_val = meta.containsKey('cell_count') ? meta.cell_count as Integer : null
+                        def sample_id = meta.containsKey('sample') ? meta.sample : meta.id
+                        return [ sample_id, meta + [ id: sample_id, single_end:false, cell_count: cell_count_val ], [ fastq_1, fastq_2 ] ]
+                    } else {
+                        error("Short-read samplesheet entry must have 'fastq_1' and 'fastq_2' columns. Found keys: ${meta.keySet()}")
+                    }
+                } else {
+                    // Long-read format - use original logic
+                    if (row.size() >= 3) {
+                        def fastq = file(row[1])
+                        cell_count_val = row[2] as Integer
+                        return [ meta.id, meta + [ single_end:true, cell_count: cell_count_val ], [ fastq ] ]
+                    } else if (row.size() == 2) {
+                        def fastq = file(row[1])
+                        return [ meta.id, meta + [ single_end:true, cell_count: null ], [ fastq ] ]
+                    } else if (meta.containsKey('fastq')) {
+                        def fastq = file(meta.fastq)
+                        cell_count_val = meta.containsKey('cell_count') ? meta.cell_count as Integer : null
+                        return [ meta.id, meta + [ single_end:true, cell_count: cell_count_val ], [ fastq ] ]
+                    } else {
+                        error("Long-read samplesheet entry must have 'fastq' column. Found keys: ${meta.keySet()}")
+                    }
+                }
         }
         .groupTuple()
         .map { samplesheet ->

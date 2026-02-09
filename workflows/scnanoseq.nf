@@ -162,7 +162,8 @@ workflow SCNANOSEQ {
     if (params.input_type == 'short_read') {
         // For short-read, keep R1 and R2 separate (don't combine via CAT_FASTQ)
         // The samplesheet parsing already provides them as separate files
-        ch_cat_fastq = ch_fastqs
+        // Combine single and multiple branches into a single channel
+        ch_cat_fastq = ch_fastqs.single.mix(ch_fastqs.multiple)
     } else {
         // For long-read, combine multiple FASTQ files if needed
         CAT_FASTQ ( ch_fastqs.multiple )

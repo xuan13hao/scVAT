@@ -1,0 +1,2 @@
+sample,fastq_1,fastq_2,cell_count
+TEST_SAMPLE,/home/xuan/scVAT/test_data/shortread/test_R1.fastq.gz,/home/xuan/scVAT/test_data/shortread/test_R2.fastq.gz,10

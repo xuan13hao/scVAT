@@ -130,7 +130,7 @@ def tag_bams(in_bam, bc_info, out_bam, extract_from_readid=False, whitelist=None
 
         umi_bc_infos = {}
         if bc_info and not extract_from_readid:
-            umi_bc_infos = read_bc_info(bc_info)
+        umi_bc_infos = read_bc_info(bc_info)
 
         for read in fh_in_bam:
             if extract_from_readid:
@@ -161,34 +161,34 @@ def tag_bams(in_bam, bc_info, out_bam, extract_from_readid=False, whitelist=None
                     fh_out_bam.write(read)
             else:
                 # Original long-read logic
-                parsed_read_name = read.query_name.split("_")[0]
+            parsed_read_name = read.query_name.split("_")[0]
 
-                if parsed_read_name in umi_bc_infos:
-                    umi_bc_info = umi_bc_infos[parsed_read_name]
+            if parsed_read_name in umi_bc_infos:
+                umi_bc_info = umi_bc_infos[parsed_read_name]
 
-                    # Add the barcode
-                    if not read.has_tag(BC_TAG):
-                        read.tags += [(BC_TAG, umi_bc_info.bc)]
+                # Add the barcode
+                if not read.has_tag(BC_TAG):
+                    read.tags += [(BC_TAG, umi_bc_info.bc)]
 
-                    # Add the barcode quality
-                    if not read.has_tag(BC_QUAL_TAG):
-                        read.tags += [(BC_QUAL_TAG, umi_bc_info.bc_qual)]
+                # Add the barcode quality
+                if not read.has_tag(BC_QUAL_TAG):
+                    read.tags += [(BC_QUAL_TAG, umi_bc_info.bc_qual)]
 
-                    # Add the umi
-                    if not read.has_tag(UMI_TAG):
-                        read.tags += [(UMI_TAG, umi_bc_info.umi)]
+                # Add the umi
+                if not read.has_tag(UMI_TAG):
+                    read.tags += [(UMI_TAG, umi_bc_info.umi)]
 
-                    # Add the umi quality
-                    if not read.has_tag(UMI_QUAL_TAG):
-                        read.tags += [(UMI_QUAL_TAG, umi_bc_info.umi_qual)]
+                # Add the umi quality
+                if not read.has_tag(UMI_QUAL_TAG):
+                    read.tags += [(UMI_QUAL_TAG, umi_bc_info.umi_qual)]
 
-                    # Add the corrected_bc tag
-                    if not read.has_tag(CORRECTED_TAG):
-                        read.tags += [(CORRECTED_TAG, umi_bc_info.corrected_bc)]
+                # Add the corrected_bc tag
+                if not read.has_tag(CORRECTED_TAG):
+                    read.tags += [(CORRECTED_TAG, umi_bc_info.corrected_bc)]
 
-                    read.query_name = "_".join([parsed_read_name, umi_bc_info.bc, umi_bc_info.umi])
+                read.query_name = "_".join([parsed_read_name, umi_bc_info.bc, umi_bc_info.umi])
 
-                    fh_out_bam.write(read)
+                fh_out_bam.write(read)
 
 
 def read_bc_info(bc_info):

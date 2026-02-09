@@ -116,6 +116,32 @@ total_reads <- as.numeric(gsub("([0-9]+).*$", "\\1", flagstat_lines[index_nums])
 
 
 ######################
+### CALCULATE MT % ###
+######################
+
+# Calculate mitochondrial read percentage
+# Try common mitochondrial gene name patterns
+mt_patterns <- c("^MT-", "^mt-", "^Mt-", "^chrM", "^ChrM", "^Mito", "^mito")
+mt_genes <- NULL
+
+for (pattern in mt_patterns) {
+    mt_genes <- grep(pattern, rownames(seurat_obj), value = TRUE, ignore.case = TRUE)
+    if (length(mt_genes) > 0) {
+        break
+    }
+}
+
+if (length(mt_genes) > 0) {
+    seurat_obj[["percent.mt"]] <- PercentageFeatureSet(seurat_obj, features = mt_genes)
+    mt_percentage <- mean(seurat_obj$percent.mt, na.rm = TRUE)
+} else {
+    # No mitochondrial genes found
+    seurat_obj[["percent.mt"]] <- 0
+    mt_percentage <- 0
+    warning("No mitochondrial genes detected. Common patterns tried: ", paste(mt_patterns, collapse = ", "))
+}
+
+######################
 ### GENERATE PLOTS ###
 ######################
 
@@ -131,8 +157,12 @@ setwd(opt$outdir)
 # Use prefix for out files
 out_sample_qc_figs <- paste0(opt$outprefix,".png")
 
-# Generate the violin plot
-violin_plot <- VlnPlot(object = seurat_obj, features = c("nFeature_RNA", "nCount_RNA"), assay = "RNA")
+# Generate the violin plot (include percent.mt if available)
+violin_features <- c("nFeature_RNA", "nCount_RNA")
+if (length(mt_genes) > 0) {
+    violin_features <- c(violin_features, "percent.mt")
+}
+violin_plot <- VlnPlot(object = seurat_obj, features = violin_features, assay = "RNA")
 
 # Generate the density plots
 densityplot_nFeature <- plotSingleCellDensity(input_obj = seurat_obj, metadata_variable = "nFeature_RNA", scale_x_axis = TRUE)
@@ -172,15 +202,30 @@ median_features_per_cell <- median(seurat_obj$nFeature_RNA)
 # Get the "Total Number of Features" detected
 total_number_features <- nrow(seurat_obj@assays$RNA@counts)
 
+# Get the "Mean Mitochondrial Read Percentage"
+mean_mt_percentage <- round(mt_percentage, digits = 2)
+
 ####################
 ### OUTPUT TABLE ###
 ####################
 
 # Acquire all stats
-output_table <- data.frame(est_cell_number, mean_reads_per_cell, median_features_per_cell, total_number_features)
+output_table <- data.frame(
+    est_cell_number, 
+    mean_reads_per_cell, 
+    median_features_per_cell, 
+    total_number_features,
+    mean_mt_percentage
+)
 
 # Set the colnames for the output table
-colnames(output_table) <- c("Estimated Cell Number", "Mean Reads Per Cell", "Median Feautures Per Cell", "Total Number of Features")
+colnames(output_table) <- c(
+    "Estimated Cell Number", 
+    "Mean Reads Per Cell", 
+    "Median Feautures Per Cell", 
+    "Total Number of Features",
+    "Mean Mitochondrial Read Percentage (%)"
+)
 
 # Write out the data frame
 out_stats <- paste0(opt$outprefix,".csv")

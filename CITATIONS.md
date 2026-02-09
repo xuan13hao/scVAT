@@ -2,9 +2,9 @@
 
 ## [nf-core](https://pubmed.ncbi.nlm.nih.gov/32055031/)
 
-## [nf-core/scnanoseq](https://doi.org/10.1101/2025.04.08.647887)
+## [scVAT]
 
-> Trull A, nf-core community, Worthey EA, Ianov L. scnanoseq: an nf-core pipeline for Oxford Nanopore single-cell RNA-sequencing. bioRxiv 2025.04.08.647887; doi: https://doi.org/10.1101/2025.04.08.647887
+> >Hao Xuan, Hongyang Sun, Xiangtao Liu, Hanyuan Zhang, Jun Zhang, Cuncong Zhong. A general and extensible algorithmic framework to biological sequence alignment across scales and applications. bioRxiv 2026.01.28.702355; doi: https://doi.org/10.64898/2026.01.28.702355
 
 > Ewels PA, Peltzer A, Fillinger S, Patel H, Alneberg J, Wilm A, Garcia MU, Di Tommaso P, Nahnsen S. The nf-core framework for community-curated bioinformatics pipelines. Nat Biotechnol. 2020 Mar;38(3):276-278. doi: 10.1038/s41587-020-0439-x. PubMed PMID: 32055031.
 

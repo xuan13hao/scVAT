@@ -306,11 +306,16 @@ workflow SCNANOSEQ {
         // For short-read, unzip both R1 and R2 separately
         GUNZIP_FASTQ( ch_gunzip_r1.mix(ch_gunzip_r2) )
         ch_unzipped_fastqs = GUNZIP_FASTQ.out.file
+            .map { meta, file ->
+                // Create a grouping key without 'read' for grouping R1 and R2 together
+                def group_key = meta - ['read']
+                [group_key, meta, file]
+            }
             .groupTuple(by: [0])
-            .map { meta_list, files ->
+            .map { group_key, meta_list, files ->
                 // Reconstruct the original meta (without 'read' key) and pair files
-                def meta = meta_list[0] - ['read']
-                [meta, files]
+                // Use the group_key (which already has 'read' removed) and the files
+                [group_key, files]
             }
     } else {
         // For long-read, format is already correct

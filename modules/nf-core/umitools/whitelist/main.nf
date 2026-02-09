@@ -23,8 +23,11 @@ process UMITOOLS_WHITELIST {
     script:
     def args = task.ext.args ?: ''
     prefix = task.ext.prefix ?: "${meta.id}"
-    def bc_len = barcode_length ? "--bc-pattern=NNN${barcode_length}" : "--bc-pattern=NNN16"
-    def umi_len = umi_length ? "--bc-pattern=NNN${barcode_length}NNN${umi_length}" : "--bc-pattern=NNN16NNN12"
+    // Build bc-pattern: NNN (random) + C repeated bc_len times (barcode) + N repeated umi_len times (UMI)
+    // For 10X: NNNCCCCCCCCCCCCCCNNNNNNNNNNNN (16bp barcode, 12bp UMI)
+    def bc_len = barcode_length ?: 16
+    def umi_len = umi_length ?: 12
+    def bc_pattern_str = "NNN" + ("C" * bc_len) + ("N" * umi_len)
 
     """
     PYTHONHASHSEED=0 umi_tools \\
@@ -33,7 +36,7 @@ process UMITOOLS_WHITELIST {
         --stdout ${prefix}.whitelist.txt \\
         --log2stderr \\
         --log ${prefix}.log \\
-        $bc_len \\
+        --bc-pattern ${bc_pattern_str} \\
         $args
 
     cat <<-END_VERSIONS > versions.yml

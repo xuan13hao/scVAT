@@ -46,7 +46,8 @@ workflow PROCESS_SHORTREAD_SCRNA {
         //
 
         // Determine alignment mode based on whether this is genome or transcriptome alignment
-        alignment_mode = genome_aligned ? 'splice' : 'wgs'
+        // --splice is for RNA-seq reads (transcriptome), --wgs is for genomic reads (genome)
+        alignment_mode = genome_aligned ? 'wgs' : 'splice'
         
         ALIGN_SHORTREADS(
             fasta,

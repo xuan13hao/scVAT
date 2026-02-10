@@ -52,7 +52,7 @@ VAT dna \
 - `reference`: 参考序列（FASTA 或 .vatf 索引）
 - `bam_format`: 是否输出 BAM 格式（true/false）
 - `bam_index_extension`: BAM 索引扩展名（如 "bai"）
-- `alignment_mode`: 对齐模式（'splice', 'wgs', 'circ', 'sr'）
+- `alignment_mode`: 对齐模式（'splice', 'wgs', 'circ'）
 - `long_read_mode`: 是否为长读长模式（true/false）
 
 **输出**:
@@ -64,10 +64,9 @@ VAT dna \
 
 | 模式 | 标志 | 用途 | 适用场景 |
 |------|------|------|----------|
-| `splice` | `--splice` | 剪接感知对齐 | 基因组对齐（长读长/短读长） |
-| `wgs` | `--wgs` | 全基因组对齐 | 转录组对齐（长读长/短读长） |
+| `splice` | `--splice` | 剪接感知对齐（RNA-seq） | 转录组对齐（RNA-seq reads） |
+| `wgs` | `--wgs` | 全基因组对齐 | 基因组对齐（genomic reads） |
 | `circ` | `--circ` | 环状 RNA 对齐 | 环状 RNA 检测 |
-| `sr` | `--sr` | 短读长优化 | 短读长数据（Illumina） |
 
 **长读长标志**:
 - `--long`: 启用长读长模式（用于 Oxford Nanopore/PacBio 数据）
@@ -87,7 +86,7 @@ PROCESS_LONGREAD_SCRNA
   └─> ALIGN_LONGREADS
         ├─> VAT_INDEX (可选)
         └─> VAT_ALIGN
-              ├─> alignment_mode: 'splice' (基因组) 或 'wgs' (转录组)
+              ├─> alignment_mode: 'wgs' (基因组) 或 'splice' (转录组)
               └─> long_read_mode: true
 ```
 
@@ -103,14 +102,14 @@ ALIGN_LONGREADS(
     skip_qc,                  // 是否跳过 QC
     skip_rseqc,               // 是否跳过 RSeQC
     skip_bam_nanocomp,        // 是否跳过 NanoComp
-    'splice',                  // 对齐模式：'splice' 或 'wgs'
+    'wgs',                     // 对齐模式：'wgs' (基因组) 或 'splice' (转录组)
     true                       // long_read_mode: true
 )
 ```
 
 **VAT 参数**:
-- 基因组对齐: `VAT dna -d <ref> -q <fastq> --splice --long -o <output> -f sam -p <cpus>`
-- 转录组对齐: `VAT dna -d <ref> -q <fastq> --wgs --long -o <output> -f sam -p <cpus>`
+- 基因组对齐: `VAT dna -d <ref> -q <fastq> --wgs --long -o <output> -f sam -p <cpus>`
+- 转录组对齐: `VAT dna -d <ref> -q <fastq> --splice --long -o <output> -f sam -p <cpus>`
 
 ---
 
@@ -124,30 +123,30 @@ PROCESS_SHORTREAD_SCRNA
   └─> ALIGN_SHORTREADS
         ├─> VAT_INDEX (可选)
         └─> VAT_ALIGN
-              ├─> alignment_mode: 'splice' (基因组) 或 'wgs' (转录组)
+              ├─> alignment_mode: 'wgs' (基因组) 或 'splice' (转录组)
               └─> long_read_mode: false
 ```
 
 **示例调用**:
 ```groovy
-ALIGN_SHORTREADS(
-    fasta,                    // 参考基因组/转录组
-    fai,                      // FASTA 索引
-    gtf,                      // GTF 注释文件
-    fastq_r2,                 // R2 FASTQ（转录序列）
-    rseqc_bed,                // RSeQC BED 文件
-    skip_save_minimap2_index, // 是否跳过索引构建
-    skip_qc,                  // 是否跳过 QC
-    skip_rseqc,               // 是否跳过 RSeQC
-    skip_bam_nanocomp,        // 是否跳过 NanoComp
-    'splice',                  // 对齐模式：'splice' 或 'wgs'
-    false                      // long_read_mode: false
-)
+        ALIGN_SHORTREADS(
+            fasta,                    // 参考基因组/转录组
+            fai,                      // FASTA 索引
+            gtf,                      // GTF 注释文件
+            fastq_r2,                 // R2 FASTQ（转录序列）
+            rseqc_bed,                // RSeQC BED 文件
+            skip_save_minimap2_index, // 是否跳过索引构建
+            skip_qc,                  // 是否跳过 QC
+            skip_rseqc,               // 是否跳过 RSeQC
+            skip_bam_nanocomp,        // 是否跳过 NanoComp
+            'wgs',                     // 对齐模式：'wgs' (基因组) 或 'splice' (转录组)
+            false                      // long_read_mode: false (不使用 --long 标志)
+        )
 ```
 
 **VAT 参数**:
-- 基因组对齐: `VAT dna -d <ref> -q <fastq_r2> --splice --sr -o <output> -f sam -p <cpus>`
-- 转录组对齐: `VAT dna -d <ref> -q <fastq_r2> --wgs --sr -o <output> -f sam -p <cpus>`
+- 基因组对齐: `VAT dna -d <ref> -q <fastq_r2> --wgs -o <output> -f sam -p <cpus>`
+- 转录组对齐: `VAT dna -d <ref> -q <fastq_r2> --splice -o <output> -f sam -p <cpus>`
 
 **注意**: 短读长模式下，VAT 对齐的是 R2（转录序列），R1 包含 barcode/UMI，不参与对齐。
 

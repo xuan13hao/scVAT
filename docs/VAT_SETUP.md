@@ -59,8 +59,8 @@ nextflow run nf-core/scnanoseq \
 - 位置: `modules/local/vat_align.nf`
 - 功能: 执行序列比对
 - 支持的比对模式:
-  - `--splice`: 用于基因组比对（splice-aware）
-  - `--wgs`: 用于转录组比对
+  - `--splice`: 用于转录组比对（RNA-seq reads，splice-aware）
+  - `--wgs`: 用于基因组比对（genomic reads）
   - `--long`: 长读长模式（Oxford Nanopore）
 
 ## 配置参数

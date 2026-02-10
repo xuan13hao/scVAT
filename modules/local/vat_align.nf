@@ -29,8 +29,8 @@ process VAT_ALIGN {
     def args2 = task.ext.args2 ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     // Determine alignment mode based on input type
-    // For short reads, use appropriate preset (typically --sr for short reads)
-    // For long reads, use splice/wgs/circ as before
+    // For short reads, use splice (genome) or wgs (transcriptome) mode
+    // For long reads, use splice/wgs/circ as before, with --long flag
     def mode_flag = ''
     if (alignment_mode == 'splice') {
         mode_flag = '--splice'

@@ -233,7 +233,7 @@ The scVAT pipeline is a dual-pathway single-cell RNA-seq analysis framework that
 ### Stage 4: Alignment
 **Tool**: VAT (Versatile Alignment Tool)
 
-- **Mode**: Short-read optimized (`--sr` flag)
+- **Mode**: Standard alignment (no special short-read flag)
 - **Strategy**: Hash-based seed-and-extend
 - **Modes**:
   - Genome alignment: Splice-aware (`--splice`)

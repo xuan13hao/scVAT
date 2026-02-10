@@ -48,9 +48,8 @@ workflow PROCESS_LONGREAD_SCRNA {
 
         // Determine alignment mode based on whether this is genome or transcriptome alignment
         // This is determined by the workflow name (PROCESS_LONGREAD_SCRNA_GENOME vs PROCESS_LONGREAD_SCRNA_TRANSCRIPT)
-        // We'll pass this as a parameter - default to 'splice' for genome, 'wgs' for transcriptome
-        // The actual mode will be set in modules.config based on workflow name
-        alignment_mode = genome_aligned ? 'splice' : 'wgs'
+        // --splice is for RNA-seq reads (transcriptome), --wgs is for genomic reads (genome)
+        alignment_mode = genome_aligned ? 'wgs' : 'splice'
         
         ALIGN_LONGREADS(
             fasta,
@@ -62,7 +61,7 @@ workflow PROCESS_LONGREAD_SCRNA {
             skip_qc,
             skip_rseqc,
             skip_bam_nanocomp,
-            alignment_mode,  // 'splice' for genome, 'wgs' for transcriptome
+            alignment_mode,  // 'wgs' for genome (genomic reads), 'splice' for transcriptome (RNA-seq reads)
             true              // long_read_mode: true for Oxford Nanopore long reads
         )
         ch_versions = ch_versions.mix(ALIGN_LONGREADS.out.versions)

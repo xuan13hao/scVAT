@@ -1,1 +1,4 @@
-2026-02-10 10:29:15	2m 41s	pensive_hypatia	ERR	8672f793b7a53b2c9a827cf54345daae	60f15d8c-67ee-4c97-b5e6-25cbb34b4052	nextflow run . -profile test_minimal,singularity --outdir test_output/minimal_longread
+2026-02-10 10:51:28	17.7s	extravagant_monod	ERR	8672f793b7a53b2c9a827cf54345daae	d0df9261-88f0-4536-acea-166c595ad353	nextflow run . -profile test_longread,docker --outdir test_output/longread_dryrun
+2026-02-10 10:51:51	-	prickly_euler	-	8672f793b7a53b2c9a827cf54345daae	f4a75f75-e1ca-45a6-83c3-a40dd5fd1982	nextflow run . -profile test_shortread,docker --outdir test_output/shortread_dryrun
+2026-02-10 10:52:25	1m 58s	angry_snyder	ERR	8672f793b7a53b2c9a827cf54345daae	a9be385c-2b89-4139-8e04-92e5bc45c614	nextflow run . -profile test_minimal,singularity --outdir test_output/minimal_longread
+2026-02-10 10:52:39	-	lethal_mclean	-	8672f793b7a53b2c9a827cf54345daae	d8ac6201-fc85-40f3-ab83-1cca2f84c266	nextflow run . --help

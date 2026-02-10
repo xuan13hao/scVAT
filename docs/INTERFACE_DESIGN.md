@@ -189,7 +189,7 @@ if (params.input_type == 'short_read') {
 |--------|-----------|------------|
 | Barcode Detection | BLAZE | UMI-tools whitelist |
 | Barcode Extraction | Custom script | UMI-tools extract |
-| Alignment Mode | VAT `--long` | VAT `--sr` |
+| Alignment Mode | VAT `--long` + `--splice`/`--wgs` | VAT `--splice`/`--wgs` (no `--long`) |
 | Deduplication | Optional (UMI-tools or Picard) | Mandatory (UMI-tools only) |
 | QC Tools | FastQC, NanoPlot, NanoComp, ToulligQC | FastQC |
 

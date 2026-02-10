@@ -53,7 +53,7 @@ workflow ALIGN_LONGREADS {
             ch_vat_ref,
             true,  // bam_format
             "bai", // bam_index_extension
-            alignment_mode,  // alignment_mode: 'splice' for genome, 'wgs' for transcriptome
+            alignment_mode,  // alignment_mode: 'wgs' for genome (genomic reads), 'splice' for transcriptome (RNA-seq reads)
             long_read_mode   // long_read_mode: true for long reads
         )
 

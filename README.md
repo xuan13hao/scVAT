@@ -1,275 +1,425 @@
+# scVAT: Single-Cell RNA-seq Analysis Pipeline
 
-## Introduction
-scVAT: An nf-core single-cell RNA-sequencing analysis pipeline supporting both short and long reads
+**scVAT** is a scalable Nextflow DSL2 pipeline for analyzing single-cell/nuclei RNA-seq data from both **long-read (Oxford Nanopore)** and **short-read (Illumina)** platforms. The pipeline uses **VAT (Versatile Alignment Tool)** for alignment and follows nf-core best practices.
 
-**nf-core/scVAT** is a bioinformatics best-practice analysis pipeline for single-cell/nuclei RNA-seq data supporting both **long-read (Oxford Nanopore)** and **short-read (Illumina)** sequencing technologies. The pipeline uses **VAT (Versatile Alignment Tool)** as the core aligner for both data types.
+[![Nextflow](https://img.shields.io/badge/nextflow-%E2%89%A524.04.2-brightgreen.svg)](https://www.nextflow.io/)
+[![Docker](https://img.shields.io/badge/docker-supported-blue.svg)](https://www.docker.com/)
+[![Singularity](https://img.shields.io/badge/singularity-supported-blue.svg)](https://sylabs.io/docs/)
 
-For **long-read data**, the pipeline is designed for 10X Genomics single-cell/nuclei RNA-seq data derived from Oxford Nanopore Q20+ chemistry ([R10.4 flow cells (>Q20)](https://nanoporetech.com/about-us/news/oxford-nanopore-announces-technology-updates-nanopore-community-meeting)). 
+---
 
-For **short-read data**, the pipeline supports Illumina paired-end FASTQ files where R1 contains barcode/UMI sequences and R2 contains transcript sequences.
+## Features
 
-The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool to run tasks across multiple compute infrastructures in a very portable manner. It uses Docker/Singularity containers making installation trivial and results highly reproducible. The [Nextflow DSL2](https://www.nextflow.io/docs/latest/dsl2.html) implementation of this pipeline uses one container per process which makes it much easier to maintain and update software dependencies. Where possible, these processes have been submitted to and installed from [nf-core/modules](https://github.com/nf-core/modules) in order to make them available to all nf-core pipelines, and to everyone within the Nextflow community!
+- ✅ **Dual-mode support**: Long-read (Nanopore) and short-read (Illumina)
+- ✅ **VAT alignment**: Fast and accurate alignment for both read types
+- ✅ **10X Genomics compatible**: BLAZE barcode detection for long reads, UMI-tools for short reads
+- ✅ **Flexible quantification**: IsoQuant (gene/transcript) and Oarfish (transcript-only)
+- ✅ **Comprehensive QC**: FastQC, NanoPlot, MultiQC, and Seurat metrics
+- ✅ **Containerized**: Full Docker and Singularity support
+- ✅ **Scalable**: Optimized for both small and large datasets
 
-On release, automated continuous integration tests run the pipeline on a full-sized dataset on the AWS cloud infrastructure. This ensures that the pipeline runs on AWS, has sensible resource allocation defaults set to run on real-world datasets, and permits the persistent storage of results to benchmark between pipeline releases and other analysis sources. The results obtained from the full-sized test can be viewed on the [nf-core website](https://nf-co.re/scnanoseq/results).
+---
 
-## VAT Integration
+## Quick Start
 
-This pipeline now incorporates **VAT (Versatile Alignment Tool)** as the primary alignment tool for long-read sequencing data. VAT provides efficient and accurate alignment of Oxford Nanopore reads to reference genomes and transcriptomes, replacing minimap2 in the alignment workflow.
+### Prerequisites
 
-### VAT Installation
+- [Nextflow](https://www.nextflow.io/) ≥24.04.2
+- [Docker](https://www.docker.com/) or [Singularity](https://sylabs.io/docs/)
+- VAT binary (place in `bin/` directory or ensure it's in PATH)
 
-VAT is automatically integrated into the pipeline workflow. To use VAT, you need to provide the VAT binary file:
+### Installation
 
-## Pipeline summary
+```bash
+# Clone the repository
+git clone https://github.com/xuan13hao/scVAT.git
+cd scVAT
 
-The pipeline supports two input types controlled by the `--input_type` parameter:
+# Ensure VAT binary is available
+chmod +x bin/VAT  # If VAT is in bin/
 
-### Long-read (Oxford Nanopore) workflow (`--input_type long_read`):
-1. Raw read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/), [`NanoPlot`](https://github.com/wdecoster/NanoPlot), [`NanoComp`](https://github.com/wdecoster/nanocomp) and [`ToulligQC`](https://github.com/GenomiqueENS/toulligQC))
-2. Unzip and split FASTQ ([`pigz`](https://github.com/madler/pigz))
-   1. Optional: Split FASTQ for faster processing ([`split`](https://linux.die.net/man/1/split))
-3. Trim and filter reads ([`Nanofilt`](https://github.com/wdecoster/nanofilt))
-4. Post trim QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/), [`NanoPlot`](https://github.com/wdecoster/NanoPlot), [`NanoComp`](https://github.com/wdecoster/nanocomp) and [`ToulligQC`](https://github.com/GenomiqueENS/toulligQC))
-5. Barcode detection using a custom whitelist or 10X whitelist. ([`BLAZE`](https://github.com/shimlab/BLAZE))
-6. Extract barcodes. Consists of the following steps:
-   1. Parse FASTQ files into R1 reads containing barcode and UMI and R2 reads containing sequencing without barcode and UMI (custom script `./bin/pre_extract_barcodes.py`)
-   2. Re-zip FASTQs ([`pigz`](https://github.com/madler/pigz))
-7. Barcode correction (custom script `./bin/correct_barcodes.py`)
-8. Post-extraction QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/), [`NanoPlot`](https://github.com/wdecoster/NanoPlot), [`NanoComp`](https://github.com/wdecoster/nanocomp) and [`ToulligQC`](https://github.com/GenomiqueENS/toulligQC))
-9. **Alignment to the genome, transcriptome, or both using [`VAT`](https://github.com/xuan13hao/VAT)** (Versatile Alignment Tool)
-   - VAT index generation (`.vatf` format) for reference genomes/transcriptomes
-   - Splice-aware alignment for genome mapping
-   - Whole-genome and transcriptome alignment modes
-   - Optimized for long-read Oxford Nanopore data
-10. Post-alignment filtering of mapped reads and gathering mapping QC ([`SAMtools`](http://www.htslib.org/doc/samtools.html))
-11. Post-alignment QC in unfiltered BAM files ([`NanoComp`](https://github.com/wdecoster/nanocomp), [`RSeQC`](https://rseqc.sourceforge.net/))
-12. Barcode (BC) tagging with read quality, BC quality, UMI quality (custom script `./bin/tag_barcodes.py`)
-13. Read deduplication ([`UMI-tools`](https://github.com/CGATOxford/UMI-tools) OR [`Picard MarkDuplicates`](https://broadinstitute.github.io/picard/))
-14. Gene and transcript level matrices generation with [`IsoQuant`](https://github.com/ablab/IsoQuant) and/or transcript level matrices with [`oarfish`](https://github.com/COMBINE-lab/oarfish)
-15. Preliminary matrix QC ([`Seurat`](https://github.com/satijalab/seurat))
-16. Compile QC for raw reads, trimmed reads, pre and post-extracted reads, mapping metrics and preliminary single-cell/nuclei QC ([`MultiQC`](http://multiqc.info/))
+# Test the installation
+./quick_test.sh
+```
 
-### Short-read (Illumina) workflow (`--input_type short_read`):
-1. Raw read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
-2. Unzip paired-end FASTQ files ([`pigz`](https://github.com/madler/pigz))
-   - R1: Contains barcode and UMI sequences
-   - R2: Contains transcript sequences
-3. Trim and filter reads (optional, using [`Nanofilt`](https://github.com/wdecoster/nanofilt) or similar)
-4. **Barcode detection using [`UMI-tools whitelist`](https://github.com/CGATOxford/UMI-tools)** to identify valid cell barcodes from R1
-5. **Extract barcodes using [`UMI-tools extract`](https://github.com/CGATOxford/UMI-tools)** to move Barcode and UMI sequences from R2 to the Read ID header
-6. **Alignment to the genome, transcriptome, or both using [`VAT`](https://github.com/xuan13hao/VAT)** with short-read presets
-   - VAT index generation (`.vatf` format) for reference genomes/transcriptomes
-   - Splice-aware alignment for genome mapping
-   - Optimized for short-read Illumina data
-7. Post-alignment filtering of mapped reads and gathering mapping QC ([`SAMtools`](http://www.htslib.org/doc/samtools.html))
-8. **Barcode tagging**: Extract Barcode/UMI from Read ID and add as standard BAM tags (CB: Corrected Barcode, UB: Corrected UMI) using whitelist for correction (Hamming distance = 1)
-9. **Read deduplication**: [`UMI-tools dedup`](https://github.com/CGATOxford/UMI-tools) (mandatory for short-read data)
-10. Gene and transcript level matrices generation with [`IsoQuant`](https://github.com/ablab/IsoQuant) and/or transcript level matrices with [`oarfish`](https://github.com/COMBINE-lab/oarfish)
-11. Preliminary matrix QC ([`Seurat`](https://github.com/satijalab/seurat))
-12. Compile QC for raw reads, mapping metrics and preliminary single-cell/nuclei QC ([`MultiQC`](http://multiqc.info/))
+### Basic Usage
 
-## Usage
+#### Long-Read Data (Oxford Nanopore)
 
-> [!NOTE]
-> If you are new to Nextflow and nf-core, please refer to [this page](https://nf-co.re/docs/usage/installation) on how to set-up Nextflow. Make sure to [test your setup](https://nf-co.re/docs/usage/introduction#how-to-run-a-pipeline) with `-profile test` before running the workflow on actual data.
+```bash
+nextflow run . \
+    -profile singularity \
+    --input samplesheet_longread.csv \
+    --input_type long_read \
+    --genome_fasta genome.fa \
+    --gtf annotation.gtf \
+    --barcode_format 10X_3v3 \
+    --quantifier isoquant \
+    --outdir results/longread
+```
 
-> [!NOTE]
-> **VAT Binary Requirement**: Before running the pipeline, ensure that the VAT binary is available either in the `bin/` directory or in your system PATH. See the [VAT Installation](#vat-installation) section above for details.
+#### Short-Read Data (Illumina)
 
-First, prepare a samplesheet with your input data. The format depends on the `--input_type` parameter:
+```bash
+nextflow run . \
+    -profile singularity \
+    --input samplesheet_shortread.csv \
+    --input_type short_read \
+    --genome_fasta genome.fa \
+    --gtf annotation.gtf \
+    --quantifier isoquant \
+    --outdir results/shortread
+```
 
-### For long-read data (`--input_type long_read`):
+---
 
-```csv title="samplesheet.csv"
+## Input Format
+
+### Long-Read Samplesheet
+
+Create a CSV file with single-end FASTQ files:
+
+```csv
 sample,fastq,cell_count
-CONTROL_REP1,AEG588A1_S1.fastq.gz,5000
-CONTROL_REP1,AEG588A1_S2.fastq.gz,5000
-CONTROL_REP2,AEG588A2_S1.fastq.gz,5000
-CONTROL_REP3,AEG588A3_S1.fastq.gz,5000
-CONTROL_REP4,AEG588A4_S1.fastq.gz,5000
-CONTROL_REP4,AEG588A4_S2.fastq.gz,5000
-CONTROL_REP4,AEG588A4_S3.fastq.gz,5000
+SAMPLE1,sample1_reads.fastq.gz,5000
+SAMPLE2,sample2_reads.fastq.gz,5000
 ```
 
-Each row represents a single-end fastq file. Rows with the same sample identifier are considered technical replicates and will be automatically merged. `cell_count` refers to the expected number of cells you expect.
+- Multiple rows with the same `sample` name will be merged
+- `cell_count`: Expected number of cells for the sample
 
-### For short-read data (`--input_type short_read`):
+### Short-Read Samplesheet
 
-```csv title="samplesheet.csv"
+Create a CSV file with paired-end FASTQ files:
+
+```csv
 sample,fastq_1,fastq_2,cell_count
-CONTROL_REP1,SAMPLE1_R1.fastq.gz,SAMPLE1_R2.fastq.gz,5000
-CONTROL_REP2,SAMPLE2_R1.fastq.gz,SAMPLE2_R2.fastq.gz,5000
+SAMPLE1,sample1_R1.fastq.gz,sample1_R2.fastq.gz,5000
+SAMPLE2,sample2_R1.fastq.gz,sample2_R2.fastq.gz,5000
 ```
 
-For short-read data, you need to provide paired-end FASTQ files:
-- `fastq_1`: R1 file containing barcode and UMI sequences
-- `fastq_2`: R2 file containing transcript sequences
+- `fastq_1` (R1): Barcode and UMI sequences
+- `fastq_2` (R2): Transcript sequences
 - `cell_count`: Expected number of cells
 
-```bash
-nextflow run nf-core/scnanoseq \
-   -profile <docker/singularity/.../institute> \
-   --input samplesheet.csv \
-   --input_type <long_read|short_read> \
-   --outdir <OUTDIR>
+---
+
+## Pipeline Workflows
+
+### Long-Read Workflow
+
+```
+FASTQ → QC (FastQC/NanoPlot) → Filter (NanoFilt) →
+Barcode Detection (BLAZE) → Barcode Extraction/Correction →
+VAT Alignment → BAM Tagging → Deduplication →
+Quantification (IsoQuant/Oarfish) → MultiQC Report
 ```
 
-### Quick Test
+**Key Steps:**
+1. **QC**: FastQC, NanoPlot, NanoComp (optional)
+2. **Filtering**: NanoFilt quality filtering
+3. **Barcoding**: BLAZE detects 10X barcodes, custom scripts extract and correct
+4. **Alignment**: VAT with splice-aware mode for genome, or WGS mode for transcriptome
+5. **Tagging**: CB (cell barcode) and UB (UMI) tags added to BAM
+6. **Deduplication**: UMI-tools or Picard (optional)
+7. **Quantification**: IsoQuant and/or Oarfish
+8. **Reporting**: MultiQC aggregates all QC metrics
 
-To quickly test both long-read and short-read modes:
+### Short-Read Workflow
+
+```
+FASTQ (R1+R2) → QC (FastQC) →
+Barcode Detection (UMI-tools whitelist) → Barcode Extraction (UMI-tools) →
+VAT Alignment → BAM Tagging → Deduplication (mandatory) →
+Quantification (IsoQuant/Oarfish) → MultiQC Report
+```
+
+**Key Steps:**
+1. **QC**: FastQC on both R1 and R2
+2. **Barcoding**: UMI-tools generates whitelist and extracts barcodes to read headers
+3. **Alignment**: VAT optimized for short reads
+4. **Tagging**: Extract CB/UB from read headers to BAM tags
+5. **Deduplication**: UMI-tools (mandatory for short-read)
+6. **Quantification**: IsoQuant and/or Oarfish
+7. **Reporting**: MultiQC
+
+---
+
+## Key Parameters
+
+### Required
+
+| Parameter | Description |
+|-----------|-------------|
+| `--input` | Path to samplesheet CSV |
+| `--input_type` | `long_read` or `short_read` |
+| `--genome_fasta` | Reference genome (for IsoQuant) |
+| `--gtf` | Gene annotation GTF file |
+| `--outdir` | Output directory |
+
+### Optional
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--transcript_fasta` | null | Transcriptome FASTA (for Oarfish) |
+| `--barcode_format` | null | 10X barcode format (`10X_3v3`, `10X_5v2`, etc.) |
+| `--quantifier` | `isoquant` | Comma-separated: `isoquant`, `oarfish`, or `isoquant,oarfish` |
+| `--dedup_tool` | `umitools` | Deduplication tool: `umitools` or `picard` |
+| `--split_amount` | 0 | Split FASTQ into chunks (e.g., 500000) for faster processing |
+| `--skip_trimming` | false | Skip NanoFilt trimming |
+| `--skip_qc` | false | Skip all QC steps |
+| `--skip_dedup` | false | Skip deduplication (long-read only) |
+| `--skip_multiqc` | false | Skip MultiQC report generation |
+
+---
+
+## Output Structure
+
+```
+results/
+├── multiqc/
+│   ├── multiqc_report_raw.html          # Pre-processing QC
+│   └── multiqc_report_final.html        # Final QC report
+├── SAMPLE1/
+│   ├── alignment/
+│   │   ├── aligned.bam                  # Aligned reads
+│   │   ├── aligned.bam.bai              # BAM index
+│   │   └── flagstat.txt                 # Alignment stats
+│   ├── quantification/
+│   │   ├── isoquant/
+│   │   │   ├── gene_counts.mtx          # Gene count matrix
+│   │   │   └── transcript_counts.mtx    # Transcript count matrix
+│   │   └── oarfish/
+│   │       └── transcript_counts.mtx    # Oarfish transcript counts
+│   └── qc/
+│       ├── fastqc/                      # FastQC reports
+│       └── nanoplot/                    # NanoPlot reports (long-read)
+└── pipeline_info/
+    ├── execution_report.html            # Nextflow execution report
+    └── execution_timeline.html          # Execution timeline
+```
+
+---
+
+## Testing
+
+### Quick Validation
 
 ```bash
-# Quick validation test (checks workflow structure)
+# Syntax and parameter validation only
 ./quick_test.sh
-
-# Full test with actual data
-./test_longread_shortread.sh both
-
-# Test individual modes
-./test_longread_shortread.sh long_read
-./test_longread_shortread.sh short_read
 ```
 
-For more detailed testing instructions, see [TEST_EXAMPLES.md](TEST_EXAMPLES.md).
+### Functional Tests
 
-> [!WARNING]
-> Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_; see [docs](https://nf-co.re/docs/usage/getting_started/configuration#custom-configuration-files).
+```bash
+# Test with local data (requires less memory)
+nextflow run . -profile test_longread_local,singularity --outdir test_output/longread
+nextflow run . -profile test_shortread_local,singularity --outdir test_output/shortread
 
-For more details and further functionality, please refer to the [usage documentation](https://nf-co.re/scnanoseq/usage) and the [parameter documentation](https://nf-co.re/scnanoseq/parameters).
+# Test with minimal configuration (skips optional QC)
+nextflow run . -profile test_minimal,singularity --outdir test_output/minimal
+```
 
-## Pipeline output
-
-This pipeline produces feature-barcode matrices as the main output. These feature-barcode matrices are able to be ingested directly by most packages used for downstream analyses such as `Seurat`. Additionally, the pipeline produces a number of quality control metrics to ensure that the samples processed meet expected metrics for single-cell/nuclei data.
-
-The pipeline provides two tools to produce the aforementioned feature-barcode matrices, `IsoQuant` and `oarfish`, and the user is given the ability to choose whether to run both or just one. `IsoQuant` will require a genome fasta to be used as input to the pipeline, and will produce both gene and transcript level matrices. `oarfish` will require a transcriptome fasta to be used as input to the pipeline and will produce only transcript level matrices.
-
-Alignment outputs from VAT are provided in BAM format, with corresponding index files (`.bai`). VAT index files (`.vatf`) are generated for reference genomes and transcriptomes when the `skip_save_minimap2_index` parameter is not set.
-
-To see the results of an example test run with a full size dataset refer to the [results](https://nf-co.re/scnanoseq/results) tab on the nf-core website pipeline page.
-For more details about the full set of output files and reports, please refer to the
-[output documentation](https://nf-co.re/scnanoseq/output).
+---
 
 ## Troubleshooting
 
-If you experience any issues, please make sure to reach out on the [#scnanoseq slack channel](https://nfcore.slack.com/archives/C03TUE2K6NS) or [open an issue on our GitHub repository](https://github.com/nf-core/scnanoseq/issues/new/choose). However, some resolutions for common issues will be noted below:
+### Memory Issues
 
-### VAT-related Issues
+If processes fail with "insufficient memory" errors:
 
-- **VAT binary not found**: Ensure the VAT binary is placed in the `bin/` directory with execute permissions (`chmod +x bin/VAT`), or that VAT is available in your system PATH. The pipeline will automatically detect VAT from either location.
-- **VAT index generation fails**: Check that you have sufficient disk space and write permissions in the output directory. VAT index files (`.vatf`) are typically similar in size to the input FASTA file.
-- **VAT alignment errors**: Verify that your reference FASTA file is valid and that the alignment mode (splice/wgs) matches your reference type (genome/transcriptome).
+1. **Reduce memory requirements** with a custom config:
+   ```groovy
+   process {
+       withName: '.*:SPLIT_FASTA' {
+           memory = '4.GB'
+       }
+   }
+   ```
 
-### General Pipeline Issues
+2. **Use test profiles** designed for limited memory:
+   ```bash
+   -profile test_minimal,singularity
+   ```
 
-- Due to the nature of the data this pipeline analyzes, some tools may experience increased runtimes. For some of the custom tools made for this pipeline (`preextract_fastq.py` and `correct_barcodes.py`), we have leveraged the splitting done via the `split_amount` parameter to decrease their overall runtimes. The `split_amount` parameter will split the input FASTQs into a number of FASTQ files, each containing a number of lines based on the value used for this parameter. As a result, it is important not to set this parameter to be too low as doing so would cause the creation of a large number of files the pipeline will be processed. While this value can be highly dependent on the data, a good starting point for an analysis would be to set this value to `500000`. If you find that `PREEXTRACT_FASTQ` and `CORRECT_BARCODES` are still taking long amounts of time to run, it would be worth reducing this parameter to `200000` or `100000`, but keeping the value on the order of hundred of thousands or tens of thousands should help with keeping the total number of processes minimal. An example of setting this parameter to be equal to 500000 is shown below:
+### Container Issues
 
-```yml title="params.yml"
-split_amount: 500000
+**Podman/Docker cgroup errors**: Use Singularity instead:
+```bash
+-profile singularity  # Instead of -profile docker
 ```
 
-- We have seen a recurrent node failure on slurm clusters that does seem to be related to submission of Nextflow jobs. This issue is not related to this pipeline per se, but rather to Nextflow itself. We are currently working on a resolution. But we have two methods that appear to help overcome should this issue arise:
-  1. Provide a custom config that increases the memory request for the job that failed. This may take a couple attempts to find the correct requests, but we have noted that there does appear to be a memory issue occasionally with these errors.
-  2. Request an interactive session with a decent amount of time and memory and CPUs in order to run the pipeline on the single node. Note that this will take time as there will be minimal parallelization, but this does seem to resolve the issue.
-- We note that umitools dedup can take a large amount of time in order to perform deduplication. One approach we have implemented to assist with speed is to split input files based on chromosome. However for the transcriptome aligned bams, there is some additional work required that involves grouping transcripts into appropriate chromosomes. In order to accomplish this, the pipeline needs to parse the transcript id from the transcriptome FASTA file. The transcript id is often nested in the sequence identifier with additional data and the data is delimited. We have included the delimiters used by reference files obtained from GENCODE, NCBI, and Ensembl. However in case you wish to explicitly control this or if the reference file source uses a different delimiter, you are able to manually set it via the `--fasta_delimiter` parameter.
-- We acknowledge that analyzing PromethION data is a common use case for this pipeline. Currently, the pipeline has been developed with defaults to analyze GridION and average sized PromethION data. For cases, where jobs have fail due for larger PromethION datasets, the defaults can be overwritten by a custom configuation file (provided by the `-c` Nextflow option) where resources can be increased (substantially in some cases). Below are some of the overrides we have used, and while these amounts may not work on every dataset, these will hopefully at least note which processes will need to have their resources increased:
+### VAT Binary Not Found
 
-```groovy title="custom.config"
+Ensure VAT is available:
+```bash
+# Option 1: Place in bin/ directory
+cp /path/to/VAT bin/
+chmod +x bin/VAT
 
-process
-{
-    withName: '.*:.*FASTQC.*'
-    {
-        cpus = 20
-    }
-}
+# Option 2: Add to system PATH
+export PATH="/path/to/vat:$PATH"
+```
 
-process
-{
-    withName: '.*:BLAZE'
-    {
+### BLAZE Barcode Detection Fails
+
+**Symptom**: "Failed to get whitelist" error with low percentage of valid reads
+
+**Causes**:
+- Test data lacks realistic 10X structure
+- Incorrect barcode format specified
+- Poor quality Nanopore data
+
+**Solutions**:
+```bash
+# Use correct barcode format
+--barcode_format 10X_3v3  # For 3' v3 chemistry
+--barcode_format 10X_5v2  # For 5' v2 chemistry
+
+# Or provide custom whitelist
+--whitelist /path/to/custom_whitelist.txt
+```
+
+### Performance Optimization
+
+For large datasets (PromethION):
+
+```bash
+# Enable FASTQ splitting for parallel processing
+--split_amount 500000
+
+# Increase resources in custom config
+nextflow run . -c custom.config ...
+```
+
+**custom.config:**
+```groovy
+process {
+    withName: '.*:BLAZE' {
         cpus = 30
-    }
-}
-
-process
-{
-    withName: '.*:TAG_BARCODES'
-    {
         memory = '60.GB'
     }
-}
-
-process
-{
-    withName: '.*:SAMTOOLS_SORT'
-    {
+    withName: '.*:VAT_ALIGN' {
         cpus = 20
+        memory = '40.GB'
     }
-}
-
-process
-{
-    withName: '.*:VAT_ALIGN'
-    {
-        cpus = 20
-    }
-}
-
-process
-{
-    withName: '.*:ISOQUANT'
-    {
+    withName: '.*:ISOQUANT' {
         cpus = 30
         memory = '85.GB'
     }
 }
 ```
 
-We further note that while we encourage the use of `split_amount` as discussed above for larger datasets, the pipeline can be executed without enabling this parameter. When doing this, please consider increasing the time limit to `CORRECT_BARCODES` as it can take hours instead of minutes when `split_amount` is disabled:
+### Deduplication Takes Too Long
 
-```groovy title="custom.config"
-//NOTE: with split_amount disabled, consider increasing the time limit to CORRECT_BARCODES
-process
-{
-    withName: '.*:CORRECT_BARCODES'
-    {
+```bash
+# Enable FASTQ splitting
+--split_amount 500000
+
+# Or increase time limit
+process {
+    withName: '.*:CORRECT_BARCODES' {
         time = '15.h'
     }
 }
 ```
 
-## Credits
+---
 
-nf-core/scnanoseq was originally written by [Austyn Trull](https://github.com/atrull314), and [Dr. Lara Ianov](https://github.com/lianov).
+## Advanced Usage
 
-We would also like to thank the following people and groups for their support, including financial support:
+### Resume Failed Runs
 
-- Dr. Elizabeth Worthey
-- University of Alabama at Birmingham Biological Data Science Core (U-BDS), RRID:SCR_021766, <https://github.com/U-BDS>
-- Civitan International Research Center
-- Support from: 3P30CA013148-48S8
+```bash
+nextflow run . -resume ...
+```
 
-## Contributions and Support
+### Custom Configuration
 
-If you would like to contribute to this pipeline, please see the [contributing guidelines](.github/CONTRIBUTING.md).
+```bash
+nextflow run . -c custom.config ...
+```
 
-For further information or help, don't hesitate to get in touch on the [Slack `#scnanoseq` channel](https://nfcore.slack.com/channels/scnanoseq) (you can join with [this invite](https://nf-co.re/join/slack)).
+### Skip Optional Steps
+
+```bash
+# Skip QC steps for faster processing
+--skip_nanoplot --skip_toulligqc --skip_fastq_nanocomp --skip_bam_nanocomp
+
+# Skip deduplication (long-read only)
+--skip_dedup
+
+# Skip Seurat QC
+--skip_seurat
+```
+
+### Multiple Quantifiers
+
+```bash
+# Run both IsoQuant and Oarfish
+--quantifier isoquant,oarfish \
+--genome_fasta genome.fa \
+--transcript_fasta transcriptome.fa
+```
+
+---
 
 ## Citations
 
+If you use scVAT, please cite:
 
-If you use VAT for alignment, please also cite:
+### VAT (Versatile Alignment Tool)
+> Hao Xuan, Hongyang Sun, Xiangtao Liu, Hanyuan Zhang, Jun Zhang, Cuncong Zhong. *A general and extensible algorithmic framework to biological sequence alignment across scales and applications.* bioRxiv 2026.01.28.702355; doi: https://doi.org/10.64898/2026.01.28.702355
 
-> **VAT (Versatile Alignment Tool)**
->
->Hao Xuan, Hongyang Sun, Xiangtao Liu, Hanyuan Zhang, Jun Zhang, Cuncong Zhong. A general and extensible algorithmic framework to biological sequence alignment across scales and applications. bioRxiv 2026.01.28.702355; doi: https://doi.org/10.64898/2026.01.28.702355
->
-> Please refer to the [VAT GitHub repository](https://github.com/xuan13hao/VAT) for the most current citation information.
+### nf-core Framework
+> Philip Ewels, Alexander Peltzer, Sven Fillinger, Harshil Patel, Johannes Alneberg, Andreas Wilm, Maxime Ulysse Garcia, Paolo Di Tommaso & Sven Nahnsen. *The nf-core framework for community-curated bioinformatics pipelines.* Nat Biotechnol. 2020 Feb 13. doi: [10.1038/s41587-020-0439-x](https://dx.doi.org/10.1038/s41587-020-0439-x)
 
-You can cite the `nf-core` publication as follows:
+### Tools Used
+- **BLAZE**: Barcode detection for long reads
+- **UMI-tools**: Barcode handling for short reads
+- **IsoQuant**: Gene and transcript quantification
+- **Oarfish**: Fast transcript quantification
+- **SAMtools**, **FastQC**, **NanoPlot**, **MultiQC**: Quality control
 
-> **The nf-core framework for community-curated bioinformatics pipelines.**
->
-> Philip Ewels, Alexander Peltzer, Sven Fillinger, Harshil Patel, Johannes Alneberg, Andreas Wilm, Maxime Ulysse Garcia, Paolo Di Tommaso & Sven Nahnsen.
->
-> _Nat Biotechnol._ 2020 Feb 13. doi: [10.1038/s41587-020-0439-x](https://dx.doi.org/10.1038/s41587-020-0439-x).
+See [CITATIONS.md](CITATIONS.md) for complete citations.
+
+---
+
+## Credits
+
+**Original Authors**: [Austyn Trull](https://github.com/atrull314), [Dr. Lara Ianov](https://github.com/lianov)
+
+**VAT Integration**: Extended for dual long/short-read support with VAT alignment
+
+**Support**:
+- University of Alabama at Birmingham Biological Data Science Core (U-BDS)
+- Civitan International Research Center
+- Funding: 3P30CA013148-48S8
+
+---
+
+## Contributing
+
+Contributions are welcome! Please see [contributing guidelines](.github/CONTRIBUTING.md).
+
+---
+
+## License
+
+See [LICENSE](LICENSE) for details.
+
+---
+
+## Support
+
+For questions or issues:
+- Open an issue on GitHub
+- Check [TEST_RESULTS.md](TEST_RESULTS.md) for testing information
+- Review troubleshooting section above
+
+---
+
+**Pipeline Version**: 1.2.1
+**Nextflow Required**: ≥24.04.2
+**Last Updated**: 2026-02-10

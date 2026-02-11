@@ -214,8 +214,8 @@ results/
 
 ```bash
 # Test with local data (requires less memory)
-nextflow run . -profile test_longread_local,singularity --outdir test_output/longread
-nextflow run . -profile test_shortread_local,singularity --outdir test_output/shortread
+nextflow run . -profile test_longread_local,singularity --outdir test_output/longread --input_type long_read 
+nextflow run . -profile test_shortread_local,singularity --outdir test_output/shortread --input_type short_read 
 
 # Test with minimal configuration (skips optional QC)
 nextflow run . -profile test_minimal,singularity --outdir test_output/minimal
@@ -250,17 +250,6 @@ If processes fail with "insufficient memory" errors:
 -profile singularity  # Instead of -profile docker
 ```
 
-### VAT Binary Not Found
-
-Ensure VAT is available:
-```bash
-# Option 1: Place in bin/ directory
-cp /path/to/VAT bin/
-chmod +x bin/VAT
-
-# Option 2: Add to system PATH
-export PATH="/path/to/vat:$PATH"
-```
 
 ### BLAZE Barcode Detection Fails
 
@@ -325,8 +314,6 @@ process {
 }
 ```
 
----
-
 ## Advanced Usage
 
 ### Resume Failed Runs
@@ -362,11 +349,7 @@ nextflow run . -c custom.config ...
 --genome_fasta genome.fa \
 --transcript_fasta transcriptome.fa
 ```
-
----
-
 ## Citations
-
 If you use scVAT, please cite:
 
 ### VAT (Versatile Alignment Tool)
@@ -381,41 +364,16 @@ If you use scVAT, please cite:
 - **IsoQuant**: Gene and transcript quantification
 - **Oarfish**: Fast transcript quantification
 - **SAMtools**, **FastQC**, **NanoPlot**, **MultiQC**: Quality control
-
 See [CITATIONS.md](CITATIONS.md) for complete citations.
-
 ---
 
 ## Credits
-
-**Original Authors**: [Austyn Trull](https://github.com/atrull314), [Dr. Lara Ianov](https://github.com/lianov)
-
 **VAT Integration**: Extended for dual long/short-read support with VAT alignment
-
-**Support**:
-- University of Alabama at Birmingham Biological Data Science Core (U-BDS)
-- Civitan International Research Center
-- Funding: 3P30CA013148-48S8
-
----
-
-## Contributing
-
-Contributions are welcome! Please see [contributing guidelines](.github/CONTRIBUTING.md).
-
----
-
-## License
-
-See [LICENSE](LICENSE) for details.
-
 ---
 
 ## Support
-
 For questions or issues:
 - Open an issue on GitHub
-- Check [TEST_RESULTS.md](TEST_RESULTS.md) for testing information
 - Review troubleshooting section above
 
 ---

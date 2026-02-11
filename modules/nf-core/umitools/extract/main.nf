@@ -3,7 +3,7 @@ process UMITOOLS_EXTRACT {
     label "process_medium"
 
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    container "${ workflow.containerEngine == 'singularity' ?
         'https://depot.galaxyproject.org/singularity/umi_tools:1.1.5--py39hf95cd2a_0' :
         'biocontainers/umi_tools:1.1.5--py39hf95cd2a_0' }"
 
@@ -26,27 +26,29 @@ process UMITOOLS_EXTRACT {
     prefix = task.ext.prefix ?: "${meta.id}"
     def bc_len = barcode_length ?: 16
     def umi_len = umi_length ?: 12
-    // Pattern: NNN for random positions, then barcode (C), then UMI (N)
-    // For 10X: --bc-pattern=NNNCCCCCCCCCCCCCCNNNNNNNNNNNN (16bp barcode, 12bp UMI)
-    // Build pattern string: NNN + C repeated bc_len times + N repeated umi_len times
-    def bc_pattern_str = "NNN" + ("C" * bc_len) + ("N" * umi_len)
+    // For reads with 3bp random prefix + barcode + UMI:
+    // Use regex to skip the random prefix (3bp), then capture barcode (C) and UMI (N)
+    // The .{3} skips any 3 bases at the start
+    def bc_pattern_str = "(?P<discard_1>.{3})(?P<cell_1>.{${bc_len}})(?P<umi_1>.{${umi_len}})"
+    def extract_method = "--extract-method=regex"
 
     """
     # UMI-tools extract: Extract barcode/UMI from R1 and add to Read ID of R2
     # R1 contains barcode/UMI, R2 contains transcript
-    # --stdin: R2 (transcript read)
-    # --read2-in: R1 (barcode/UMI read)
+    # --stdin: R1 (barcode/UMI read - where bc-pattern is applied)
+    # --read2-out: Output R2 (transcript) with modified read IDs
     # --bc-pattern: pattern in R1 to extract barcode and UMI
     PYTHONHASHSEED=0 umi_tools \\
         extract \\
-        --stdin $fastq_r2 \\
-        --bc-pattern ${bc_pattern_str} \\
-        --read2-in $fastq_r1 \\
+        --stdin $fastq_r1 \\
+        --bc-pattern '${bc_pattern_str}' \\
+        $extract_method \\
+        --read2-in $fastq_r2 \\
+        --read2-stdout \\
         --stdout ${prefix}.extracted.fastq.gz \\
         --log2stderr \\
         --log ${prefix}.log \\
         --whitelist $whitelist \\
-        --error-correct-cell \\
         --filter-cell-barcode \\
         $args
 

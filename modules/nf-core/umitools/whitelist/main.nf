@@ -3,7 +3,7 @@ process UMITOOLS_WHITELIST {
     label "process_medium"
 
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    container "${ workflow.containerEngine == 'singularity' ?
         'https://depot.galaxyproject.org/singularity/umi_tools:1.1.5--py39hf95cd2a_0' :
         'biocontainers/umi_tools:1.1.5--py39hf95cd2a_0' }"
 
@@ -27,17 +27,25 @@ process UMITOOLS_WHITELIST {
     // For 10X: NNNCCCCCCCCCCCCCCNNNNNNNNNNNN (16bp barcode, 12bp UMI)
     def bc_len = barcode_length ?: 16
     def umi_len = umi_length ?: 12
-    def bc_pattern_str = "NNN" + ("C" * bc_len) + ("N" * umi_len)
+    // For reads with 3bp random prefix + barcode + UMI:
+    // Use regex to skip the random prefix (3bp), then capture barcode and UMI
+    def bc_pattern_str = "(?P<discard_1>.{3})(?P<cell_1>.{${bc_len}})(?P<umi_1>.{${umi_len}})"
+    def extract_method = "--extract-method=regex"
 
     """
     PYTHONHASHSEED=0 umi_tools \\
         whitelist \\
         --stdin $fastq_r1 \\
-        --stdout ${prefix}.whitelist.txt \\
+        --stdout ${prefix}.whitelist_raw.txt \\
         --log2stderr \\
         --log ${prefix}.log \\
-        --bc-pattern ${bc_pattern_str} \\
+        --bc-pattern '${bc_pattern_str}' \\
+        $extract_method \\
         $args
+
+    # UMI-tools whitelist outputs: barcode\\t\\tcount\\t
+    # But UMI-tools extract expects just the barcode, so extract first column
+    cut -f1 ${prefix}.whitelist_raw.txt > ${prefix}.whitelist.txt
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

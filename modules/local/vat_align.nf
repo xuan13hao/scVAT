@@ -44,7 +44,8 @@ process VAT_ALIGN {
     def long_flag = long_read_mode ? '--long' : ''
     def output_format = bam_format ? 'sam' : (task.ext.output_format ?: 'sam')
     def output_file = bam_format ? "${prefix}.sam" : "${prefix}.${output_format}"
-    def bam_index = bam_index_extension ? "${prefix}.bam##idx##${prefix}.bam.${bam_index_extension} --write-index" : "${prefix}.bam"
+    // For compatibility with older samtools versions, don't use --write-index
+    def bam_output = "${prefix}.bam"
     
     // Handle BAM input conversion if needed
     def bam_input = "${reads.extension}".matches('sam|bam|cram')
@@ -78,8 +79,15 @@ process VAT_ALIGN {
         $args
 
     if [ "$bam_format" = "true" ]; then
-        samtools sort -@ ${task.cpus-1} -o $bam_index ${prefix}.sam
+        samtools sort -@ ${task.cpus-1} -o $bam_output ${prefix}.sam
         rm ${prefix}.sam
+        # Create index separately for compatibility with older samtools versions
+        # Note: Very old samtools versions don't support -@ for index command
+        if [ "$bam_index_extension" = "bai" ]; then
+            samtools index $bam_output
+        elif [ "$bam_index_extension" = "csi" ]; then
+            samtools index -c $bam_output
+        fi
     fi
 
     cat <<-END_VERSIONS > versions.yml

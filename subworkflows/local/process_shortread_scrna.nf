@@ -71,7 +71,7 @@ workflow PROCESS_SHORTREAD_SCRNA {
         TAG_BARCODES (
             ALIGN_SHORTREADS.out.sorted_bam
                 .join( ALIGN_SHORTREADS.out.sorted_bai, by: 0 ),
-            whitelist,
+            whitelist.map{ it[1] },  // Extract just the file path from [meta, file]
             true  // extract_from_readid: true for short-read
         )
         ch_versions = ch_versions.mix(TAG_BARCODES.out.versions)

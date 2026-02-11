@@ -314,9 +314,11 @@ workflow SCNANOSEQ {
             }
             .groupTuple(by: [0])
             .map { group_key, meta_list, files ->
-                // Reconstruct the original meta (without 'read' key) and pair files
-                // Use the group_key (which already has 'read' removed) and the files
-                [group_key, files]
+                // Sort files by read type (R1 before R2) to ensure correct order
+                // meta_list contains the metadata for each file with 'read' key
+                def sorted_indices = meta_list.withIndex().sort { it[0].read }.collect { it[1] }
+                def sorted_files = sorted_indices.collect { files[it] }
+                [group_key, sorted_files]
             }
     } else {
         // For long-read, format is already correct
@@ -430,10 +432,8 @@ workflow SCNANOSEQ {
         // MODULE: UMI-tools extract (move Barcode/UMI from R2 to Read ID)
         //
         UMITOOLS_EXTRACT (
-            ch_fastq_r1
-                .join(ch_fastq_r2, by: 0)
-                .combine(ch_umitools_whitelist, by: 0),
-            ch_umitools_whitelist,
+            ch_fastq_r1.join(ch_fastq_r2, by: 0),
+            ch_umitools_whitelist.map { it[1] },
             params.barcode_length ?: 16,
             params.umi_length ?: 12
         )

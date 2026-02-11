@@ -3,7 +3,7 @@ process TOULLIGQC {
     tag "$meta.id"
     
     conda "bioconda::toulligqc=2.5.6"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    container "${ workflow.containerEngine == 'singularity' ?
         'https://depot.galaxyproject.org/singularity/toulligqc:2.5.6--pyhdfd78af_0':
         'quay.io/biocontainers/toulligqc:2.5.6--pyhdfd78af_0' }"
 

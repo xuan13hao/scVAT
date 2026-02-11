@@ -31,7 +31,7 @@ process SAMTOOLS_SORT {
     if ("$bam" == "${prefix}.bam") error "Input and output names are the same, use \"task.ext.prefix\" to disambiguate!"
 
     """
-    samtools cat \\
+    samtools view -h -b \\
         --threads $task.cpus \\
         ${bam} \\
     | \\

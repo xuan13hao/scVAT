@@ -3,7 +3,7 @@ process NANOPLOT {
     label 'process_high'
 
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    container "${ workflow.containerEngine == 'singularity' ?
         'https://depot.galaxyproject.org/singularity/nanoplot:1.41.6--pyhdfd78af_0' :
         'biocontainers/nanoplot:1.41.6--pyhdfd78af_0' }"
 

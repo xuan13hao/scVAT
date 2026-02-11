@@ -51,7 +51,7 @@ workflow ALIGN_SHORTREADS {
         VAT_ALIGN (
             fastq,
             ch_vat_ref,
-            true,  // bam_format
+            false, // bam_format - output SAM for short reads, let BAM_SORT_STATS_SAMTOOLS handle conversion
             "bai", // bam_index_extension
             alignment_mode,  // alignment_mode: 'wgs' for genome (genomic reads), 'splice' for transcriptome (RNA-seq reads)
             long_read_mode   // long_read_mode: false for short reads
@@ -61,8 +61,8 @@ workflow ALIGN_SHORTREADS {
 
         //
         // SUBWORKFLOW: BAM_SORT_STATS_SAMTOOLS
-        // The subworkflow is called in both the VAT bams and filtered (mapped only) version
-        BAM_SORT_STATS_SAMTOOLS ( VAT_ALIGN.out.bam, fasta )
+        // For short reads, VAT_ALIGN outputs SAM format, which BAM_SORT_STATS_SAMTOOLS will convert to BAM
+        BAM_SORT_STATS_SAMTOOLS ( VAT_ALIGN.out.sam, fasta )
         ch_versions = ch_versions.mix(BAM_SORT_STATS_SAMTOOLS.out.versions)
 
         // acquire only mapped reads from bam for downstream processing

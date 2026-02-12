@@ -340,9 +340,7 @@ nextflow run . -c custom.config ...
 # Skip Seurat QC
 --skip_seurat
 ```
-
 ### Multiple Quantifiers
-
 ```bash
 # Run both IsoQuant and Oarfish
 --quantifier isoquant,oarfish \
@@ -351,10 +349,8 @@ nextflow run . -c custom.config ...
 ```
 ## Citations
 If you use scVAT, please cite:
-
 ### VAT (Versatile Alignment Tool)
 > Hao Xuan, Hongyang Sun, Xiangtao Liu, Hanyuan Zhang, Jun Zhang, Cuncong Zhong. *A general and extensible algorithmic framework to biological sequence alignment across scales and applications.* bioRxiv 2026.01.28.702355; doi: https://doi.org/10.64898/2026.01.28.702355
-
 ### nf-core Framework
 > Philip Ewels, Alexander Peltzer, Sven Fillinger, Harshil Patel, Johannes Alneberg, Andreas Wilm, Maxime Ulysse Garcia, Paolo Di Tommaso & Sven Nahnsen. *The nf-core framework for community-curated bioinformatics pipelines.* Nat Biotechnol. 2020 Feb 13. doi: [10.1038/s41587-020-0439-x](https://dx.doi.org/10.1038/s41587-020-0439-x)
 
@@ -366,16 +362,10 @@ If you use scVAT, please cite:
 - **SAMtools**, **FastQC**, **NanoPlot**, **MultiQC**: Quality control
 See [CITATIONS.md](CITATIONS.md) for complete citations.
 ---
-
-## Credits
-**VAT Integration**: Extended for dual long/short-read support with VAT alignment
----
-
 ## Support
 For questions or issues:
 - Open an issue on GitHub
 - Review troubleshooting section above
-
 ---
 
 **Pipeline Version**: 1.2.1

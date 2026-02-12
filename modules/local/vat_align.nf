@@ -39,7 +39,7 @@ process VAT_ALIGN {
     } else if (alignment_mode == 'wgs') {
         mode_flag = '--wgs'
     } else if (alignment_mode == 'sr' || alignment_mode == 'short_read') {
-        mode_flag = '--sr'  // Short-read preset for VAT
+        mode_flag = ''  // Short-read preset for VAT
     }
     def long_flag = long_read_mode ? '--long' : ''
     def output_format = bam_format ? 'sam' : (task.ext.output_format ?: 'sam')
@@ -63,7 +63,7 @@ process VAT_ALIGN {
     elif command -v VAT >/dev/null 2>&1; then
         VAT_BIN=\$(command -v VAT)
     else
-        echo "ERROR: VAT binary not found. Please place VAT in bin/ directory or ensure it's in PATH." >&2
+        echo 'ERROR: VAT binary not found. Please place VAT in bin/ directory or ensure it is in PATH.' >&2
         exit 1
     fi
     
@@ -90,11 +90,25 @@ process VAT_ALIGN {
         fi
     fi
 
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        vat: \$(\$VAT_BIN --version 2>&1 || echo "version unknown")
-        samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
-    END_VERSIONS
+    # Get versions and write to versions.yml
+    vat_ver=\$(\$VAT_BIN --version 2>&1 | head -1 | sed 's/Error.*//' | xargs 2>/dev/null || echo "version unknown")
+    if echo "\$vat_ver" | grep -qiE "(unrecognised|error)"; then
+        vat_ver="version unknown"
+    fi
+    # Ensure vat_ver is not empty
+    if [ -z "\$vat_ver" ]; then
+        vat_ver="version unknown"
+    fi
+    samtools_ver=\$(samtools --version 2>&1 | sed 's/^.*samtools //; s/Using.*\$//' | head -1 | xargs 2>/dev/null || echo "unknown")
+    # Ensure samtools_ver is not empty
+    if [ -z "\$samtools_ver" ]; then
+        samtools_ver="unknown"
+    fi
+    
+    # Write versions.yml - ensure values are on same line and properly quoted
+    echo "${task.process}:" > versions.yml
+    echo "    vat: \"\${vat_ver}\"" >> versions.yml
+    echo "    samtools: \"\${samtools_ver}\"" >> versions.yml
     """
 
     stub:

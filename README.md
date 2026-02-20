@@ -1,22 +1,22 @@
-# scVAT: Single-Cell RNA-seq Analysis Pipeline
+# scVAT
 
-**scVAT** is a scalable Nextflow DSL2 pipeline for analyzing single-cell/nuclei RNA-seq data from both **long-read (Oxford Nanopore)** and **short-read (Illumina)** platforms. The pipeline uses **VAT (Versatile Alignment Tool)** for alignment and follows nf-core best practices.
+**scVAT** is a Nextflow DSL2 pipeline for single-cell/single-nucleus RNA-seq analysis supporting both **long-read (Oxford Nanopore)** and **short-read (Illumina 10x Genomics)** data. It uses **VAT (Versatile Alignment Tool)** for alignment and follows nf-core conventions.
 
 [![Nextflow](https://img.shields.io/badge/nextflow-%E2%89%A524.04.2-brightgreen.svg)](https://www.nextflow.io/)
-[![Docker](https://img.shields.io/badge/docker-supported-blue.svg)](https://www.docker.com/)
 [![Singularity](https://img.shields.io/badge/singularity-supported-blue.svg)](https://sylabs.io/docs/)
+[![Docker](https://img.shields.io/badge/docker-supported-blue.svg)](https://www.docker.com/)
 
 ---
 
-## Features
+## Overview
 
-- ✅ **Dual-mode support**: Long-read (Nanopore) and short-read (Illumina)
-- ✅ **VAT alignment**: Fast and accurate alignment for both read types
-- ✅ **10X Genomics compatible**: BLAZE barcode detection for long reads, UMI-tools for short reads
-- ✅ **Flexible quantification**: IsoQuant (gene/transcript) and Oarfish (transcript-only)
-- ✅ **Comprehensive QC**: FastQC, NanoPlot, MultiQC, and Seurat metrics
-- ✅ **Containerized**: Full Docker and Singularity support
-- ✅ **Scalable**: Optimized for both small and large datasets
+| Feature | Long-Read (Nanopore) | Short-Read (Illumina) |
+|---------|---------------------|----------------------|
+| Barcode detection | BLAZE | UMI-tools whitelist |
+| Alignment | VAT (splice/WGS mode) | VAT (splice/WGS mode) |
+| Deduplication | UMI-tools or Picard (optional) | UMI-tools per-gene+per-cell (mandatory) |
+| Quantifiers | `isoquant`, `oarfish` | `umitools_count` |
+| QC | FastQC, NanoPlot, ToulligQC, RSeQC, MultiQC | FastQC, RSeQC, MultiQC |
 
 ---
 
@@ -24,81 +24,71 @@
 
 ### Prerequisites
 
-- [Nextflow](https://www.nextflow.io/) ≥24.04.2
-- [Docker](https://www.docker.com/) or [Singularity](https://sylabs.io/docs/)
-- VAT binary (place in `bin/` directory or ensure it's in PATH)
+- [Nextflow](https://www.nextflow.io/) ≥ 24.04.2
+- [Singularity](https://sylabs.io/docs/) or [Docker](https://www.docker.com/)
+- VAT binary in `bin/` or on `$PATH`
 
 ### Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/xuan13hao/scVAT.git
 cd scVAT
-
-# Ensure VAT binary is available
-chmod +x bin/VAT  # If VAT is in bin/
-
+chmod +x bin/VAT
 ```
 
-### Basic Usage
-
-#### Long-Read Data (Oxford Nanopore)
+### Run Tests
 
 ```bash
+# Long-read (Nanopore)
 nextflow run . \
     -profile singularity \
-    --input samplesheet_longread.csv \
+    -c conf/test_memory_limit.config \
+    --input test_data/longread/samplesheet_longread.csv \
     --input_type long_read \
-    --genome_fasta genome.fa \
-    --gtf annotation.gtf \
+    --genome_fasta test_data/longread/chr21_ref.fa \
+    --gtf https://raw.githubusercontent.com/nf-core/test-datasets/scnanoseq/reference/chr21.gtf \
     --barcode_format 10X_3v3 \
     --quantifier isoquant \
-    --outdir results/longread
-```
+    --outdir test_output/longread
 
-#### Short-Read Data (Illumina)
-
-```bash
+# Short-read (Illumina 10x)
 nextflow run . \
     -profile singularity \
-    --input samplesheet_shortread.csv \
+    -c conf/test_memory_limit.config \
+    --input test_data/shortread/samplesheet_shortread.csv \
     --input_type short_read \
-    --genome_fasta genome.fa \
-    --gtf annotation.gtf \
-    --quantifier isoquant \
-    --outdir results/shortread
+    --genome_fasta test_data/shortread/chr21_ref.fa \
+    --gtf https://raw.githubusercontent.com/nf-core/test-datasets/scnanoseq/reference/chr21.gtf \
+    --barcode_length 16 \
+    --umi_length 12 \
+    --quantifier umitools_count \
+    --outdir test_output/shortread
 ```
 
 ---
 
-## Input Format
+## Samplesheet Format
 
-### Long-Read Samplesheet
-
-Create a CSV file with single-end FASTQ files:
+### Long-Read
 
 ```csv
 sample,fastq,cell_count
-SAMPLE1,sample1_reads.fastq.gz,5000
-SAMPLE2,sample2_reads.fastq.gz,5000
+SAMPLE1,/path/to/sample1.fastq.gz,5000
+SAMPLE2,/path/to/sample2.fastq.gz,5000
 ```
 
-- Multiple rows with the same `sample` name will be merged
-- `cell_count`: Expected number of cells for the sample
+Multiple rows with the same `sample` are merged before processing.
 
-### Short-Read Samplesheet
-
-Create a CSV file with paired-end FASTQ files:
+### Short-Read
 
 ```csv
 sample,fastq_1,fastq_2,cell_count
-SAMPLE1,sample1_R1.fastq.gz,sample1_R2.fastq.gz,5000
-SAMPLE2,sample2_R1.fastq.gz,sample2_R2.fastq.gz,5000
+SAMPLE1,/path/to/sample1_R1.fastq.gz,/path/to/sample1_R2.fastq.gz,5000
+SAMPLE2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,5000
 ```
 
-- `fastq_1` (R1): Barcode and UMI sequences
-- `fastq_2` (R2): Transcript sequences
-- `cell_count`: Expected number of cells
+- `fastq_1` (R1): contains barcode + UMI
+- `fastq_2` (R2): contains the cDNA sequence (aligned)
 
 ---
 
@@ -107,43 +97,38 @@ SAMPLE2,sample2_R1.fastq.gz,sample2_R2.fastq.gz,5000
 ### Long-Read Workflow
 
 ```
-FASTQ → QC (FastQC/NanoPlot) → Filter (NanoFilt) →
-Barcode Detection (BLAZE) → Barcode Extraction/Correction →
-VAT Alignment → BAM Tagging → Deduplication →
-Quantification (IsoQuant/Oarfish) → MultiQC Report
+Raw FASTQ
+  → QC (FastQC / NanoPlot / ToulligQC)
+  → Quality filtering (NanoFilt)
+  → Barcode detection (BLAZE)
+  → Barcode extraction and correction
+  → VAT alignment (genome or transcriptome)
+  → CB/UB BAM tagging
+  → Optional deduplication (UMI-tools or Picard)
+  → Quantification (IsoQuant and/or Oarfish)
+  → MultiQC report
 ```
-
-**Key Steps:**
-1. **QC**: FastQC, NanoPlot, NanoComp (optional)
-2. **Filtering**: NanoFilt quality filtering
-3. **Barcoding**: BLAZE detects 10X barcodes, custom scripts extract and correct
-4. **Alignment**: VAT with splice-aware mode for genome, or WGS mode for transcriptome
-5. **Tagging**: CB (cell barcode) and UB (UMI) tags added to BAM
-6. **Deduplication**: UMI-tools or Picard (optional)
-7. **Quantification**: IsoQuant and/or Oarfish
-8. **Reporting**: MultiQC aggregates all QC metrics
 
 ### Short-Read Workflow
 
 ```
-FASTQ (R1+R2) → QC (FastQC) →
-Barcode Detection (UMI-tools whitelist) → Barcode Extraction (UMI-tools) →
-VAT Alignment → BAM Tagging → Deduplication (mandatory) →
-Quantification (IsoQuant/Oarfish) → MultiQC Report
+R1 + R2 FASTQ
+  → QC (FastQC)
+  → Barcode whitelist generation (UMI-tools whitelist from R1)
+  → Barcode + UMI extraction into read headers (UMI-tools extract)
+  → VAT alignment of R2 (cDNA)
+  → CB/UB BAM tagging (Hamming-distance ≤ 1 correction)
+  → Gene assignment (featureCounts → XT BAM tag)
+  → Per-gene + per-cell UMI deduplication (UMI-tools dedup)
+  → Count matrix generation (UMI-tools count → TSV + MEX)
+  → MultiQC report
 ```
 
-**Key Steps:**
-1. **QC**: FastQC on both R1 and R2
-2. **Barcoding**: UMI-tools generates whitelist and extracts barcodes to read headers
-3. **Alignment**: VAT optimized for short reads
-4. **Tagging**: Extract CB/UB from read headers to BAM tags
-5. **Deduplication**: UMI-tools (mandatory for short-read)
-6. **Quantification**: IsoQuant and/or Oarfish
-7. **Reporting**: MultiQC
+> **Note**: NanoFilt, NanoPlot, ToulligQC, and NanoComp are Nanopore-specific tools and are automatically skipped for short-read mode.
 
 ---
 
-## Key Parameters
+## Parameters
 
 ### Required
 
@@ -151,23 +136,80 @@ Quantification (IsoQuant/Oarfish) → MultiQC Report
 |-----------|-------------|
 | `--input` | Path to samplesheet CSV |
 | `--input_type` | `long_read` or `short_read` |
-| `--genome_fasta` | Reference genome (for IsoQuant) |
 | `--gtf` | Gene annotation GTF file |
+| `--quantifier` | Quantifier(s) to run (see below) |
 | `--outdir` | Output directory |
 
-### Optional
+### Reference Genome
+
+| Parameter | Description |
+|-----------|-------------|
+| `--genome_fasta` | Reference genome FASTA (required for `isoquant` and `umitools_count`) |
+| `--transcript_fasta` | Transcriptome FASTA (required for `oarfish`) |
+| `--fasta_delimiter` | Delimiter in FASTA sequence IDs (default: space) |
+
+### Barcode Options
+
+| Parameter | Mode | Default | Description |
+|-----------|------|---------|-------------|
+| `--barcode_format` | long-read | — | 10x chemistry: `10X_3v3`, `10X_3v4`, `10X_5v2`, `10X_5v3` |
+| `--barcode_length` | short-read | `16` | Cell barcode length in bp |
+| `--umi_length` | short-read | `12` | UMI length in bp |
+| `--whitelist` | both | — | Custom barcode whitelist (overrides built-in) |
+| `--dedup_tool` | long-read | `umitools` | Dedup tool: `umitools` or `picard` |
+
+**Built-in whitelists** (used when `--barcode_format` is set without `--whitelist`):
+
+| Format | Chemistry |
+|--------|-----------|
+| `10X_3v3` | 10x 3′ v3 (3M-february-2018) |
+| `10X_3v4` | 10x 3′ v4 / PEX (3M-3pgex-may-2023) |
+| `10X_5v2` | 10x 5′ v2 (737K-august-2016) |
+| `10X_5v3` | 10x 5′ v3 / PEX (3M-5pgex-jan-2023) |
+
+### Quantifiers
+
+| Value | Mode | Description |
+|-------|------|-------------|
+| `isoquant` | long-read | Gene + transcript counts via IsoQuant |
+| `oarfish` | long-read | Transcript counts via Oarfish (requires `--transcript_fasta`) |
+| `umitools_count` | short-read | Per-gene+per-cell UMI counts via featureCounts + UMI-tools |
+
+Comma-separate to run multiple: `--quantifier isoquant,oarfish`
+
+### Alignment
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--transcript_fasta` | null | Transcriptome FASTA (for Oarfish) |
-| `--barcode_format` | null | 10X barcode format (`10X_3v3`, `10X_5v2`, etc.) |
-| `--quantifier` | `isoquant` | Comma-separated: `isoquant`, `oarfish`, or `isoquant,oarfish` |
-| `--dedup_tool` | `umitools` | Deduplication tool: `umitools` or `picard` |
-| `--split_amount` | 0 | Split FASTQ into chunks (e.g., 500000) for faster processing |
-| `--skip_trimming` | false | Skip NanoFilt trimming |
-| `--skip_qc` | false | Skip all QC steps |
-| `--skip_dedup` | false | Skip deduplication (long-read only) |
-| `--skip_multiqc` | false | Skip MultiQC report generation |
+| `--kmer_size` | `14` | Minimizer k-mer length for VAT |
+| `--stranded` | — | Library strandness: `None`, `reverse`, `forward` |
+| `--save_genome_secondary_alignment` | `false` | Save secondary genome alignments |
+| `--save_transcript_secondary_alignment` | `true` | Save secondary transcriptome alignments |
+
+### Read Filtering (long-read only)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--min_length` | `1` | Minimum read length (bp) |
+| `--min_q_score` | `10` | Minimum average quality score |
+| `--split_amount` | `0` | Split FASTQ into chunks for parallel processing (0 = disabled) |
+
+### Skip Flags
+
+| Flag | Description |
+|------|-------------|
+| `--skip_trimming` | Skip NanoFilt trimming (long-read only) |
+| `--skip_qc` | Skip all QC steps |
+| `--skip_fastqc` | Skip FastQC |
+| `--skip_nanoplot` | Skip NanoPlot |
+| `--skip_toulligqc` | Skip ToulligQC |
+| `--skip_fastq_nanocomp` | Skip NanoComp on FASTQ |
+| `--skip_bam_nanocomp` | Skip NanoComp on BAM |
+| `--skip_rseqc` | Skip RSeQC read distribution |
+| `--skip_seurat` | Skip Seurat QC |
+| `--skip_dedup` | Skip deduplication (long-read only; short-read always deduplicates) |
+| `--skip_multiqc` | Skip MultiQC report |
+| `--skip_save_minimap2_index` | Do not publish VAT index files |
 
 ---
 
@@ -175,197 +217,152 @@ Quantification (IsoQuant/Oarfish) → MultiQC Report
 
 ```
 results/
-├── multiqc/
-│   ├── multiqc_report_raw.html          # Pre-processing QC
-│   └── multiqc_report_final.html        # Final QC report
-├── SAMPLE1/
-│   ├── alignment/
-│   │   ├── aligned.bam                  # Aligned reads
-│   │   ├── aligned.bam.bai              # BAM index
-│   │   └── flagstat.txt                 # Alignment stats
-│   ├── quantification/
-│   │   ├── isoquant/
-│   │   │   ├── gene_counts.mtx          # Gene count matrix
-│   │   │   └── transcript_counts.mtx    # Transcript count matrix
-│   │   └── oarfish/
-│   │       └── transcript_counts.mtx    # Oarfish transcript counts
-│   └── qc/
-│       ├── fastqc/                      # FastQC reports
-│       └── nanoplot/                    # NanoPlot reports (long-read)
-└── pipeline_info/
-    ├── execution_report.html            # Nextflow execution report
-    └── execution_timeline.html          # Execution timeline
+├── batch_qcs/
+│   ├── nanocomp/fastq/               # NanoComp FASTQ comparison (long-read)
+│   ├── read_counts/                  # Read counts across preprocessing steps
+│   └── multiqc/
+│       ├── raw_qc/                   # MultiQC: pre-processing QC
+│       └── final_qc/                 # MultiQC: final QC
+│
+├── references/
+│   ├── genome/vat_index/             # VAT genome index (if saved)
+│   └── transcriptome/vat_index/      # VAT transcriptome index (if saved)
+│
+├── pipeline_info/                    # Execution reports and software versions
+│
+└── SAMPLE_ID/
+    ├── genome/
+    │   ├── bam/
+    │   │   ├── original/             # VAT-aligned BAM
+    │   │   ├── mapped_only/          # Filtered (mapped reads only)
+    │   │   ├── barcode_tagged/       # CB/UB-tagged BAM
+    │   │   └── dedup/                # Deduplicated BAM (long-read)
+    │   ├── isoquant/                 # IsoQuant output + MEX matrices
+    │   ├── featurecounts/            # featureCounts annotated BAM + summary (short-read)
+    │   ├── dedup/                    # Deduplicated BAM (short-read)
+    │   └── umitools_count/
+    │       ├── *_counts.tsv.gz       # Long-format UMI count table
+    │       └── *_mtx/
+    │           ├── matrix.mtx        # MEX sparse matrix
+    │           ├── barcodes.tsv      # Cell barcodes
+    │           └── features.tsv      # Gene features
+    │
+    ├── transcriptome/
+    │   ├── bam/                      # Transcript-aligned BAMs
+    │   └── oarfish/                  # Oarfish transcript counts
+    │
+    └── qc/
+        ├── fastqc/                   # FastQC HTML reports
+        ├── nanoplot/                 # NanoPlot stats (long-read)
+        ├── toulligqc/                # ToulligQC reports (long-read)
+        ├── samtools/                 # Flagstat / idxstats / stats
+        ├── rseqc/                    # RSeQC read distribution
+        └── seurat_isoquant/          # Seurat QC metrics
 ```
+
+The count matrices in `*_mtx/` are compatible with Seurat (`Read10X()`), scanpy (`sc.read_10x_mtx()`), and standard 10x Genomics loaders.
 
 ---
 
-## Testing
+## Advanced Usage
 
-### Quick Validation
-
-```bash
-# Syntax and parameter validation only
-./quick_test.sh
-```
-
-### Functional Tests
+### Resume a failed run
 
 ```bash
-# Test with local data (requires less memory)
-nextflow run . -profile test_longread_local,singularity --outdir test_output/longread --input_type long_read 
-nextflow run . -profile test_shortread_local,singularity --outdir test_output/shortread --input_type short_read 
-
-# Test with minimal configuration (skips optional QC)
-nextflow run . -profile test_minimal,singularity --outdir test_output/minimal
+nextflow run . -resume [original parameters...]
 ```
 
----
-
-## Troubleshooting
-
-### Memory Issues
-
-If processes fail with "insufficient memory" errors:
-
-1. **Reduce memory requirements** with a custom config:
-   ```groovy
-   process {
-       withName: '.*:SPLIT_FASTA' {
-           memory = '4.GB'
-       }
-   }
-   ```
-
-2. **Use test profiles** designed for limited memory:
-   ```bash
-   -profile test_minimal,singularity
-   ```
-
-### Container Issues
-
-**Podman/Docker cgroup errors**: Use Singularity instead:
-```bash
--profile singularity  # Instead of -profile docker
-```
-
-
-### BLAZE Barcode Detection Fails
-
-**Symptom**: "Failed to get whitelist" error with low percentage of valid reads
-
-**Causes**:
-- Test data lacks realistic 10X structure
-- Incorrect barcode format specified
-- Poor quality Nanopore data
-
-**Solutions**:
-```bash
-# Use correct barcode format
---barcode_format 10X_3v3  # For 3' v3 chemistry
---barcode_format 10X_5v2  # For 5' v2 chemistry
-
-# Or provide custom whitelist
---whitelist /path/to/custom_whitelist.txt
-```
-
-### Performance Optimization
-
-For large datasets (PromethION):
+### Large datasets — parallel FASTQ splitting (long-read)
 
 ```bash
-# Enable FASTQ splitting for parallel processing
---split_amount 500000
-
-# Increase resources in custom config
-nextflow run . -c custom.config ...
+--split_amount 500000   # split into 500k-read chunks
 ```
 
-**custom.config:**
+### Custom resource config
+
 ```groovy
+// custom.config
 process {
     withName: '.*:BLAZE' {
-        cpus = 30
+        cpus   = 30
         memory = '60.GB'
     }
     withName: '.*:VAT_ALIGN' {
-        cpus = 20
+        cpus   = 20
         memory = '40.GB'
     }
     withName: '.*:ISOQUANT' {
-        cpus = 30
+        cpus   = 30
         memory = '85.GB'
     }
 }
 ```
 
-### Deduplication Takes Too Long
+```bash
+nextflow run . -c custom.config [other parameters...]
+```
+
+### Default resource labels
+
+| Label | CPUs | Memory | Time |
+|-------|------|--------|------|
+| `process_single` | 1 | 6 GB | 4 h |
+| `process_low` | 2 | 12 GB | 4 h |
+| `process_medium` | 6 | 36 GB | 8 h |
+| `process_high` | 12 | 72 GB | 20 h |
+| `process_long` | — | — | 60 h |
+| `process_high_memory` | — | 200 GB | — |
+
+Failed processes are retried once with scaled-up memory and CPU.
+
+---
+
+## Troubleshooting
+
+### Out-of-memory errors
+
+Use the provided memory-limit config or create your own:
 
 ```bash
-# Enable FASTQ splitting
+-c conf/test_memory_limit.config
+```
+
+### BLAZE barcode detection fails
+
+Check that `--barcode_format` matches your 10x kit. For poor-quality data or non-10x protocols, supply a custom whitelist:
+
+```bash
+--whitelist /path/to/whitelist.txt
+```
+
+### Short-read deduplication error: `--extract-umi-method=tag`
+
+Ensure your modules.config for `QUANTIFY_SCRNA_SHORTREAD:UMITOOLS_DEDUP` includes `--extract-umi-method=tag` in `ext.args`. This is set by default in `conf/modules.config`.
+
+### Pipeline hangs or hits time limits
+
+Enable FASTQ splitting to parallelize long-read jobs:
+
+```bash
 --split_amount 500000
-
-# Or increase time limit
-process {
-    withName: '.*:CORRECT_BARCODES' {
-        time = '15.h'
-    }
-}
 ```
 
-## Advanced Usage
+---
 
-### Resume Failed Runs
-
-```bash
-nextflow run . -resume ...
-```
-
-### Custom Configuration
-
-```bash
-nextflow run . -c custom.config ...
-```
-
-### Skip Optional Steps
-
-```bash
-# Skip QC steps for faster processing
---skip_nanoplot --skip_toulligqc --skip_fastq_nanocomp --skip_bam_nanocomp
-
-# Skip deduplication (long-read only)
---skip_dedup
-
-# Skip Seurat QC
---skip_seurat
-```
-### Multiple Quantifiers
-```bash
-# Run both IsoQuant and Oarfish
---quantifier isoquant,oarfish \
---genome_fasta genome.fa \
---transcript_fasta transcriptome.fa
-```
 ## Citations
+
 If you use scVAT, please cite:
-### VAT (Versatile Alignment Tool)
-> Hao Xuan, Hongyang Sun, Xiangtao Liu, Hanyuan Zhang, Jun Zhang, Cuncong Zhong. *A general and extensible algorithmic framework to biological sequence alignment across scales and applications.* bioRxiv 2026.01.28.702355; doi: https://doi.org/10.64898/2026.01.28.702355
-### nf-core Framework
-> Philip Ewels, Alexander Peltzer, Sven Fillinger, Harshil Patel, Johannes Alneberg, Andreas Wilm, Maxime Ulysse Garcia, Paolo Di Tommaso & Sven Nahnsen. *The nf-core framework for community-curated bioinformatics pipelines.* Nat Biotechnol. 2020 Feb 13. doi: [10.1038/s41587-020-0439-x](https://dx.doi.org/10.1038/s41587-020-0439-x)
 
-### Tools Used
-- **BLAZE**: Barcode detection for long reads
-- **UMI-tools**: Barcode handling for short reads
-- **IsoQuant**: Gene and transcript quantification
-- **Oarfish**: Fast transcript quantification
-- **SAMtools**, **FastQC**, **NanoPlot**, **MultiQC**: Quality control
-See [CITATIONS.md](CITATIONS.md) for complete citations.
----
-## Support
-For questions or issues:
-- Open an issue on GitHub
-- Review troubleshooting section above
+**VAT**
+> Hao Xuan, Hongyang Sun, Xiangtao Liu, Hanyuan Zhang, Jun Zhang, Cuncong Zhong. *A general and extensible algorithmic framework to biological sequence alignment across scales and applications.* bioRxiv 2026.01.28.702355; doi: [10.64898/2026.01.28.702355](https://doi.org/10.64898/2026.01.28.702355)
+
+**nf-core**
+> Ewels PA, et al. *The nf-core framework for community-curated bioinformatics pipelines.* Nat Biotechnol. 2020. doi: [10.1038/s41587-020-0439-x](https://doi.org/10.1038/s41587-020-0439-x)
+
+**Tools**: BLAZE, UMI-tools, IsoQuant, Oarfish, featureCounts (Subread), SAMtools, FastQC, NanoPlot, ToulligQC, NanoComp, RSeQC, MultiQC.
+
+See [CITATIONS.md](CITATIONS.md) for full references.
+
 ---
 
-**Pipeline Version**: 1.2.1
-**Nextflow Required**: ≥24.04.2
-**Last Updated**: 2026-02-10
+**Pipeline version**: 1.2.1 | **Nextflow**: ≥ 24.04.2 | **Last updated**: 2026-02-20

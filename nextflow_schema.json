@@ -236,8 +236,8 @@
                 },
                 "quantifier": {
                     "type": "string",
-                    "description": "Provide a comma-delimited options of quantifiers for the pipeline to use. Available tools: isoquant, oarfish",
-                    "pattern": "^(oarfish|isoquant)(,(oarfish|isoquant))*$"
+                    "description": "Provide a comma-delimited options of quantifiers for the pipeline to use. Available tools: isoquant, oarfish, umitools_count (short-read UMI scRNA-seq)",
+                    "pattern": "^(oarfish|isoquant|umitools_count)(,(oarfish|isoquant|umitools_count))*$"
                 }
             },
             "required": ["quantifier"],

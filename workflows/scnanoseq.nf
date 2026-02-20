@@ -35,7 +35,10 @@ if (params.input_type == 'short_read') {
 // Quantifiers
 
 // Associate the quantifiers with the kind of alignment needed
-GENOME_QUANT_OPTS = [ 'isoquant' ]
+// umitools_count: short-read genome path (featureCounts → umi_tools dedup per-gene → count)
+// isoquant:       long-read genome path (kept for compatibility; not recommended for short reads)
+// oarfish:        long-read transcriptome path
+GENOME_QUANT_OPTS     = [ 'isoquant', 'umitools_count' ]
 TRANSCRIPT_QUANT_OPTS = [ 'oarfish' ]
 
 genome_quants = []
@@ -334,7 +337,9 @@ workflow SCNANOSEQ {
     ch_fastqc_multiqc_postrim = Channel.empty()
     ch_trimmed_reads_combined = Channel.empty()
 
-    if (!params.skip_trimming){
+    // NanoFilt and post-trim QC tools (ToulligQC, NanoPlot) are Nanopore-specific.
+    // For short-read mode, skip the entire trimming block and use raw reads directly.
+    if (!params.skip_trimming && params.input_type != 'short_read'){
         //
         // MODULE: Split fastq
         //
@@ -611,7 +616,7 @@ workflow SCNANOSEQ {
                 params.skip_save_minimap2_index,
                 params.skip_qc,
                 params.skip_rseqc,
-                params.skip_bam_nanocomp,
+                true,  // skip_bam_nanocomp: NanoComp is Nanopore-only; always skip for short-read
                 params.skip_seurat,
                 false  // Deduplication is mandatory for short-read
             )
@@ -646,6 +651,10 @@ workflow SCNANOSEQ {
             )
             ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
                 PROCESS_SHORTREAD_SCRNA_GENOME.out.transcript_qc_stats.collect().ifEmpty([])
+            )
+            // featureCounts summary (umitools_count path) — picked up by MultiQC automatically
+            ch_multiqc_finalqc_files = ch_multiqc_finalqc_files.mix(
+                PROCESS_SHORTREAD_SCRNA_GENOME.out.count_tsv.collect{it[1]}.ifEmpty([])
             )
         } else {
             // LONG-READ: Use long-read processing workflow

@@ -6,6 +6,11 @@ process VAT_ALIGN {
     // The module will try to use $projectDir/bin/VAT first, then fall back to system VAT
     // Also need samtools for BAM conversion if output format is BAM
 
+    conda "bioconda::samtools=1.19.2"
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/samtools:1.19.2--h50ea8bc_0' :
+        'biocontainers/samtools:1.19.2--h50ea8bc_0' }"
+
     input:
     tuple val(meta), path(reads)
     tuple val(meta2), path(reference)
@@ -57,6 +62,9 @@ process VAT_ALIGN {
     def ref_db = reference
 
     """
+    # Ensure libstdc++ and other C++ libs are found (needed for VAT binary)
+    export LD_LIBRARY_PATH=/usr/local/lib:\${LD_LIBRARY_PATH:-}
+
     # Try to use VAT from bin directory first, then fall back to system PATH
     if [ -f "$projectDir/bin/VAT" ] && [ -x "$projectDir/bin/VAT" ]; then
         VAT_BIN="$projectDir/bin/VAT"

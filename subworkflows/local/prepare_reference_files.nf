@@ -43,7 +43,7 @@ workflow PREPARE_REFERENCE_FILES {
                 ch_versions = ch_versions.mix(UNZIP_GENOME_FASTA.out.versions)
 
             } else {
-                ch_genome_fasta = [ [:], genome_fasta ]
+                ch_genome_fasta = Channel.of([ [:], file(genome_fasta) ])
             }
 
             //
@@ -72,7 +72,7 @@ workflow PREPARE_REFERENCE_FILES {
                 ch_versions = ch_versions.mix(UNZIP_TRANSCRIPT_FASTA.out.versions)
 
             } else {
-                ch_transcript_fasta = [ [:], transcript_fasta ]
+                ch_transcript_fasta = Channel.of([ [:], file(transcript_fasta) ])
             }
 
             //
@@ -99,7 +99,7 @@ workflow PREPARE_REFERENCE_FILES {
             ch_versions = ch_versions.mix(UNZIP_GTF.out.versions)
 
         } else {
-            ch_prepared_gtf = [ [:], gtf]
+            ch_prepared_gtf = Channel.of([ [:], file(gtf) ])
         }
 
     emit:

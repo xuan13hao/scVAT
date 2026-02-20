@@ -38,8 +38,6 @@ cd scVAT
 # Ensure VAT binary is available
 chmod +x bin/VAT  # If VAT is in bin/
 
-# Test the installation
-./quick_test.sh
 ```
 
 ### Basic Usage
